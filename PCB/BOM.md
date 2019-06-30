@@ -15,10 +15,3 @@
 | 2    |  2,12€ | [Geekcreit® 3D Printer Stepstick DRV8825 Stepper Driver Reprap 4 Layer PCB](https://www.banggood.com/Geekcreit-3D-Printer-Stepstick-DRV8825-Stepper-Motor-Driver-Reprap-4-Layer-PCB-p-920162.html?rmmds=search&cur_warehouse=CN) |
 | 2    |  6,27€ | [HANPOSE 17HS2408 28mm Nema 17 Stepper Motor 42 Motor 42BYGH 0.6A 12N.cm](https://www.banggood.com/HANPOSE-28mm-Nema-17-Stepper-Motor-42-Motor-17HS2408-42BYGH-0_6A-12N_cm-4-lead-For-CNC-Laser-3D-Printer-Motor-p-1415423.html?rmmds=myorder&cur_warehouse=CN) |
 |      |   ~84€ | TOTAL                                                        |
-|      |        |                                                              |
-|      |        |                                                              |
-|      |        |                                                              |
-|      |        |                                                              |
-|      |        |                                                              |
-|      |        |                                                              |
-
