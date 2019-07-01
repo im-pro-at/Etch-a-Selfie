@@ -228,6 +228,32 @@ void protocol_main_loop()
   return; /* Never reached */
 }
 
+void protocol_execute_command(char *line){
+  report_echo_line_received(line, CLIENT_SERIAL);
+  // Direct and execute one line of formatted input, and report status of execution.
+  if (line[0] == 0) {
+    // Empty or comment line. For syncing purposes.
+    report_status_message(STATUS_OK, CLIENT_SERIAL);
+  } else if (line[0] == '$') {
+    // Grbl '$' system command
+    report_status_message(system_execute_line(line, CLIENT_SERIAL), CLIENT_SERIAL);
+  } else if (line[0] == '[') {
+                int cmd = 0;
+                String cmd_params;
+                if (COMMANDS::check_command (line, &cmd, cmd_params)) {
+                    ESPResponseStream espresponse(CLIENT_SERIAL);
+                    COMMANDS::execute_internal_command  (cmd, cmd_params, LEVEL_GUEST, &espresponse);
+                } else grbl_sendf(CLIENT_SERIAL, "[MSG: Unknow Command...%s]\r\n", line);
+  } else if (sys.state & (STATE_ALARM | STATE_JOG)) {
+    // Everything else is gcode. Block if in alarm or jog mode.
+    report_status_message(STATUS_SYSTEM_GC_LOCK, CLIENT_SERIAL);
+  } else {
+    // Parse and execute g-code block.
+    report_status_message(gc_execute_line(line, CLIENT_SERIAL), CLIENT_SERIAL);
+  }
+  
+}
+
 
 // Block until all buffered steps are executed or in a cycle state. Works with feed hold
 // during a synchronize call, if it should happen. Also, waits for clean cycle end.
@@ -240,6 +266,8 @@ void protocol_buffer_synchronize()
     if (sys.abort) { return; } // Check for system abort
   } while (plan_get_current_block() || (sys.state == STATE_CYCLE));
 }
+
+
 
 
 // Auto-cycle start triggers when there is a motion ready to execute and if the main program is not

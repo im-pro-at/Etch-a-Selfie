@@ -88,3 +88,7 @@
 	#include "TMC2130.h" // https://github.com/teemuatlut/TMC2130Stepper
 #endif
 
+void grbl_init();
+void grbl_service();
+void grbl_sendCMD(char *c);
+

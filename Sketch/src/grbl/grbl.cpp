@@ -35,7 +35,7 @@ volatile uint8_t sys_rt_exec_accessory_override; // Global realtime executor bit
 
 
 
-void setup() {
+void grbl_init() {
   
   serial_init();   // Setup serial baud rate and interrupts
   settings_init(); // Load Grbl settings from EEPROM
@@ -46,20 +46,6 @@ void setup() {
   system_ini();   // Configure pinout pins and pin-change interrupt (Renamed due to conflict with esp32 files)
 	
 	 
-	//#ifdef ENABLE_BLUETOOTH
-	// if $I has some text, that is the bluetooth name
-	// This is a temporary convenience until a new setting is defined
-	//char line[LINE_BUFFER_SIZE];
-	//settings_read_build_info(line);
-	//if (line[0] != '\0') {
-	//	// just send to serial because it is the only interface available
-	//	Serial.printf("Starting Bluetooth:%s", line); 
-	//	bluetooth_init(line);	
-	//}
-	//#endif
-
-  
-
   memset(sys_position,0,sizeof(sys_position)); // Clear machine position.
 
 	#ifdef USE_PEN_SERVO
@@ -98,10 +84,7 @@ void setup() {
 #ifdef ENABLE_BLUETOOTH
     bt_config.begin();
 #endif
-}
 
-void loop() {  
-  
   // Reset system variables.
   uint8_t prior_state = sys.state;
   memset(&sys, 0, sizeof(system_t)); // Clear system struct variable.
@@ -138,6 +121,16 @@ void loop() {
   report_init_message(CLIENT_ALL);
 	
   // Start Grbl main loop. Processes program inputs and executes them.  
-  protocol_main_loop();   
+  //protocol_main_loop();   
   
+}
+
+void grbl_sendCMD(char *c)
+{
+  protocol_execute_command(c);
+}
+
+void grbl_service()
+{
+  protocol_exec_rt_system();
 }

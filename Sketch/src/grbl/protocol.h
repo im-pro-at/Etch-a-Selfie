@@ -52,5 +52,7 @@ void protocol_buffer_synchronize();
 // Executes the auto cycle feature, if enabled.
 void protocol_auto_cycle_start();
 
+void protocol_execute_command(char *c);
+
 #endif
 
