@@ -1983,16 +1983,22 @@ Please make sure your boards conform to these design rules.
 <signal name="N$11">
 <contactref element="X1" pad="5"/>
 <contactref element="ESP32" pad="GPIO1"/>
-<wire x1="160.02" y1="3.81" x2="160.02" y2="19.05" width="0.254" layer="1"/>
-<wire x1="160.02" y1="19.05" x2="152.4" y2="26.67" width="0.254" layer="1"/>
-<wire x1="152.4" y1="26.67" x2="143.51" y2="26.67" width="0.254" layer="1"/>
+<wire x1="160.02" y1="3.81" x2="160.02" y2="7.62" width="0.254" layer="1"/>
+<wire x1="160.02" y1="7.62" x2="157.48" y2="10.16" width="0.254" layer="1"/>
+<wire x1="157.48" y1="10.16" x2="152.4" y2="10.16" width="0.254" layer="1"/>
+<wire x1="152.4" y1="10.16" x2="147.32" y2="15.24" width="0.254" layer="1"/>
+<wire x1="147.32" y1="15.24" x2="147.32" y2="22.86" width="0.254" layer="1"/>
+<wire x1="147.32" y1="22.86" x2="143.51" y2="26.67" width="0.254" layer="1"/>
 </signal>
 <signal name="N$12">
 <contactref element="X1" pad="4"/>
 <contactref element="ESP32" pad="GPIO3"/>
-<wire x1="157.48" y1="3.81" x2="157.48" y2="19.05" width="0.254" layer="1"/>
-<wire x1="157.48" y1="19.05" x2="152.4" y2="24.13" width="0.254" layer="1"/>
-<wire x1="152.4" y1="24.13" x2="143.51" y2="24.13" width="0.254" layer="1"/>
+<wire x1="157.48" y1="3.81" x2="157.48" y2="7.62" width="0.254" layer="1"/>
+<wire x1="157.48" y1="7.62" x2="156.21" y2="8.89" width="0.254" layer="1"/>
+<wire x1="156.21" y1="8.89" x2="152.4" y2="8.89" width="0.254" layer="1"/>
+<wire x1="152.4" y1="8.89" x2="146.05" y2="15.24" width="0.254" layer="1"/>
+<wire x1="146.05" y1="15.24" x2="146.05" y2="21.59" width="0.254" layer="1"/>
+<wire x1="146.05" y1="21.59" x2="143.51" y2="24.13" width="0.254" layer="1"/>
 </signal>
 <signal name="STEP1">
 <contactref element="IC2" pad="STEP"/>
@@ -2119,7 +2125,6 @@ Please make sure your boards conform to these design rules.
 <contactref element="GYRO" pad="SDA"/>
 <contactref element="ADC" pad="SDA"/>
 <contactref element="R1" pad="1"/>
-<contactref element="ESP32" pad="GPIO16"/>
 <wire x1="54.61" y1="34.29" x2="85.09" y2="34.29" width="0.254" layer="1"/>
 <wire x1="85.09" y1="34.29" x2="87.63" y2="36.83" width="0.254" layer="1"/>
 <wire x1="87.63" y1="36.83" x2="87.63" y2="41.91" width="0.254" layer="1"/>
@@ -2128,14 +2133,16 @@ Please make sure your boards conform to these design rules.
 <wire x1="85.09" y1="30.48" x2="85.09" y2="34.29" width="0.254" layer="1"/>
 <wire x1="87.63" y1="36.83" x2="99.06" y2="36.83" width="0.254" layer="1"/>
 <wire x1="99.06" y1="36.83" x2="101.6" y2="39.37" width="0.254" layer="1"/>
-<wire x1="148.59" y1="21.59" x2="148.59" y2="15.24" width="0.254" layer="1"/>
-<wire x1="148.59" y1="15.24" x2="147.32" y2="13.97" width="0.254" layer="1"/>
-<wire x1="147.32" y1="13.97" x2="143.51" y2="13.97" width="0.254" layer="1"/>
-<wire x1="101.6" y1="39.37" x2="134.62" y2="39.37" width="0.254" layer="1"/>
-<wire x1="134.62" y1="39.37" x2="140.97" y2="33.02" width="0.254" layer="1"/>
-<wire x1="140.97" y1="33.02" x2="140.97" y2="15.24" width="0.254" layer="1"/>
-<wire x1="140.97" y1="15.24" x2="142.24" y2="13.97" width="0.254" layer="1"/>
-<wire x1="142.24" y1="13.97" x2="143.51" y2="13.97" width="0.254" layer="1"/>
+<wire x1="101.6" y1="39.37" x2="137.16" y2="39.37" width="0.254" layer="1"/>
+<contactref element="ESP32" pad="GPIO4"/>
+<wire x1="137.16" y1="39.37" x2="148.59" y2="27.94" width="0.254" layer="1"/>
+<wire x1="148.59" y1="27.94" x2="148.59" y2="21.59" width="0.254" layer="1"/>
+<wire x1="148.59" y1="27.94" x2="157.48" y2="27.94" width="0.254" layer="1"/>
+<via x="157.48" y="27.94" extent="1-16" drill="0.4"/>
+<wire x1="157.48" y1="27.94" x2="160.02" y2="27.94" width="0.254" layer="16"/>
+<via x="160.02" y="27.94" extent="1-16" drill="0.4"/>
+<wire x1="160.02" y1="27.94" x2="165.1" y2="27.94" width="0.254" layer="1"/>
+<wire x1="165.1" y1="27.94" x2="166.37" y2="29.21" width="0.254" layer="1"/>
 </signal>
 </signals>
 </board>

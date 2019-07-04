@@ -11613,9 +11613,9 @@ Source: http://products.nichicon.co.jp/en/pdf/XJA043/e-ud.pdf</description>
 <wire x1="15.24" y1="83.82" x2="15.24" y2="86.36" width="0.1524" layer="91"/>
 <junction x="15.24" y="83.82"/>
 <wire x1="15.24" y1="83.82" x2="10.16" y2="83.82" width="0.1524" layer="91"/>
-<wire x1="10.16" y1="83.82" x2="10.16" y2="124.46" width="0.1524" layer="91"/>
-<pinref part="ESP32" gate="G$1" pin="GPIO16"/>
-<wire x1="10.16" y1="124.46" x2="40.64" y2="124.46" width="0.1524" layer="91"/>
+<wire x1="10.16" y1="83.82" x2="10.16" y2="137.16" width="0.1524" layer="91"/>
+<pinref part="ESP32" gate="G$1" pin="GPIO4"/>
+<wire x1="40.64" y1="137.16" x2="10.16" y2="137.16" width="0.1524" layer="91"/>
 </segment>
 </net>
 </nets>
