@@ -5,6 +5,7 @@
     <script>
 
     $(function(){
+    
       Webcam.set({
         width: 800,
         height: 600,
@@ -13,12 +14,15 @@
       });
       
     
-      Webcam.reset();
-      Webcam.attach( '#my_camera' );
-            
     });
 
+    function setup() {
+			Webcam.reset();
+			Webcam.attach( '#my_camera' );
+		}
+
 		function take_snapshot() {
+            
 			// take snapshot and get image data
 			Webcam.snap( function(data_uri) {
 				// display results in page
@@ -656,10 +660,10 @@
   </head>
   
   <body>
-    <div id="my_camera"  style="display:none"></div>
+    <div id="my_camera" ></div>
     <img id="image" src="test.jpg">
     <br><canvas id="c" > </canvas>
-		<br><input type="button" value="Take Snapshot" onClick="take_snapshot()">
+    <br><input type="button" value="Access Camera" onClick="setup(); $(this).hide().next().show();"><input type="button" value="Take Snapshot" onClick="take_snapshot()" style="display:none">
     <br>gamma:<input type="text" id="g" value="0.8">
     <br>phi:<input type="text" id="p" value="0.4">
     <br><button onclick="etch();"> etch </button> <button onclick="stop();"> stop </button>
