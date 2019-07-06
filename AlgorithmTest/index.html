@@ -3,12 +3,14 @@
     <script src="jquery.min.js"></script>
     <script src="webcam.js"></script>
     <script>
+    var w=800;
+    var h=600;
 
     $(function(){
     
       Webcam.set({
-        width: 800,
-        height: 600,
+        width: w,
+        height: h,
         image_format: 'jpeg',
         jpeg_quality: 90
       });
@@ -30,95 +32,86 @@
 			} );
 		}
     
+    
+    var bw=null;
+    function display()
+    {
+      var rctx=$("<canvas />")[0].getContext('2d');
+      rctx.canvas.width=w;
+      rctx.canvas.height=h;
+      imageData = rctx.getImageData(0, 0, w, h);
+      var data_u32 = new Uint32Array(imageData.data.buffer);
+      var black= (255 << 24) +(0<<16)+(0<<8)+(0<<0) 
+      var red  = (255 << 24) +(0<<16)+(0<<8)+(255<<0) 
+      var green= (255 << 24) +(0<<16)+(255<<8)+(0<<0) 
+      var white= 0; //transparent
+
+      for (var i=0; i<w*h;i++){
+        var v=bw[(i/4)|0]
+        switch((v >> ((i%4)*2)) & 0b11){
+          case 1:
+            data_u32[i]=black;
+            break;
+          case 2:
+            data_u32[i]=red;
+            break;
+          case 3:
+            data_u32[i]=green;
+            break;
+          default:
+            data_u32[i]=white;
+            break;
+        }
+      }
+      rctx.putImageData(imageData, 0, 0);
+      var ctx=$("#c")[0].getContext('2d');
+      ctx.canvas.width=800;
+      ctx.canvas.height=600;
+      
+      ctx.drawImage(rctx.canvas,0,0,800,600,0,0,ctx.canvas.width,ctx.canvas.height);
+    }
+
+      setInterval(function(){
+        if(bw!=null)
+          display();
+      },1);
+    
       var etchWorker=null;
       function etch(){
-            var w=800;
-            var h=600;
-            var bw=null;
-            function bw_get(x,y){ 
-              pos=x+y*w;
-              var v=bw[(pos/4)|0]
-              if(v==0) return 0;
-              if(v==0b01010101) return 1;
-              return (v >> ((pos%4)*2)) & 0b11
-            }
-            
-            function display()
-            {
-              var rctx=$("<canvas />")[0].getContext('2d');
-              rctx.canvas.width=w;
-              rctx.canvas.height=h;
-              imageData = rctx.getImageData(0, 0, w, h);
-              var data_u32 = new Uint32Array(imageData.data.buffer);
-              var black= (255 << 24) +(0<<16)+(0<<8)+(0<<0) 
-              var red  = (255 << 24) +(0<<16)+(0<<8)+(255<<0) 
-              var green= (255 << 24) +(0<<16)+(255<<8)+(0<<0) 
-              var white= 0; //transparent
-
-              for (var i=0; i<w*h;i++){
-                switch(bw_get(i%w,(i/w)|0)){
-                  case 1:
-                    data_u32[i]=black;
-                    break;
-                  case 2:
-                    data_u32[i]=red;
-                    break;
-                  case 3:
-                    data_u32[i]=green;
-                    break;
-                  default:
-                    data_u32[i]=white;
-                    break;
-                }
-              }
-              rctx.putImageData(imageData, 0, 0);
-              var ctx=$("#c")[0].getContext('2d');
-              ctx.canvas.width=800;
-              ctx.canvas.height=600;
-              
-              ctx.drawImage(rctx.canvas,0,0,800,600,0,0,ctx.canvas.width,ctx.canvas.height);
-            }
-          etchWorker = new Worker(URL.createObjectURL(new Blob(['('+worker+')()'])));
-          var newData=true;
-          etchWorker.onmessage=function(e){
-            if((typeof e.data)==="string"){
-              newData=false;
-              display();  
-              $("#gcode").val(e.data);
-            }
-            else{
-              bw=e.data;
-            }
+        stop();
+        etchWorker = new Worker(URL.createObjectURL(new Blob(['('+worker+')('+w+','+h+')'])));
+        var newData=true;
+        etchWorker.onmessage=function(e){
+          if((typeof e.data)==="string"){
+            newData=false;
+            display();  
+            $("#gcode").val(e.data);
           }
-          
-          function updateDisplay(){
-            if(bw!=null)
-              display();
-            if(newData && etchWorker!=null)
-              setTimeout(updateDisplay,1);
+          else{
+            bw=e.data;
           }
-            
-          updateDisplay();
+        }
+          
 
-          //start
-          var config =  {
-            gamma: parseFloat($("#g").val()),
-            phi: parseFloat($("#p").val()),
-          };
-          
-          var canvas=$("<canvas />")[0];
-          canvas.width=w;
-          canvas.height=h;
-          canvas.getContext('2d').drawImage(document.getElementById("image"),0,0);
-          
-          var image=  new Uint8Array(new ArrayBuffer(w*h));
+        //start
+        var config =  {
+          gamma: parseFloat($("#g").val()),
+          phi: parseFloat($("#p").val()),
+        };
+        
+        var canvas=$("<canvas />")[0];
+        canvas.width=w;
+        canvas.height=h;
+        canvas.getContext('2d').drawImage(document.getElementById("image"),0,0);
+        
+        var image=  new Uint8Array(new ArrayBuffer(w*h));
 
-          var imageData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
-          for (var i=0; i<canvas.width*canvas.height;i++){
-            image[i]=(imageData.data[i*4+0]*0.299+imageData.data[i*4+1]*0.587+imageData.data[i*4+2]*0.114);
-          }
-          
-          etchWorker.postMessage([config,image]);          
+        var imageData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+        for (var i=0; i<canvas.width*canvas.height;i++){
+          image[i]=(imageData.data[i*4+0]*0.299+imageData.data[i*4+1]*0.587+imageData.data[i*4+2]*0.114);
+        }
+        
+        etchWorker.postMessage([config,image]);          
       }
       
       function stop(){
@@ -128,11 +121,8 @@
       }
       
       
-      function worker(){
+      function worker(w,h){
       
-        var w=800;
-        var h=600;
-        
         //PSRAM  
         var buffer1 = new ArrayBuffer(w*h*2);
         var buffer2 = new ArrayBuffer(w*h*2);
@@ -638,8 +628,6 @@
                 ldx=dx;
                 ldy=dy;
               }
-              else
-                console.log("skipp")
             }  
             
             cx=discoverd[0]%w;
