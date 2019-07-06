@@ -556,7 +556,7 @@
                 var dy=((n/3)|0)%3==0?1:((((n/3)|0)%3==1)?0:-1);
                 var next=ax+dx +(ay+dy)*w;
                 if (ax+dx>=0 && ay+dy>=0 && ax+dx<w && ay+dy<h && done[next]){
-                  var c=cost[next]+1;
+                  var c=cost[next]+((dx!=0 && dy!=0)?14:10);
                   if(cmin>c)
                     cmin=c;
                 }
@@ -602,27 +602,19 @@
               var ay=(discoverd[i]/w)|0;
               var c=cost[discoverd[i]];
               var found=0;
-              var ldx=0;
-              var ldy=0;
-              var ndx=0;
-              var ndy=0;
               for(var n=0;n<9;n++){
                 var dx=n%3==0?1:((n%3==1)?0:-1);
                 var dy=((n/3)|0)%3==0?1:((((n/3)|0)%3==1)?0:-1);
                 var next=ax+dx+(ay+dy)*w;
                 if ((dx!=0 || dy!=0) && ax+dx>=0 && ay+dy>=0 && 
                                       ax+dx<w  && ay+dy<h  && done[next]){
-                  if(c>cost[next] || (c==cost[next] && (dx==ldx && dy==ldy))){
+                  if(c>cost[next]){
                     c=cost[next];
                     discoverd[i+1]=next;
-                    ndx=dx;
-                    ndy=dy;
                     found=1;
                   }
                 }
               }
-              ldx=ndx;
-              ldy=ndy;
               if(found==0) debugger;
             }
 
