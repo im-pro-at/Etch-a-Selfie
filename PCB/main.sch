@@ -11099,7 +11099,6 @@ Source: http://products.nichicon.co.jp/en/pdf/XJA043/e-ud.pdf</description>
 <part name="GND8" library="supply1" deviceset="GND" device=""/>
 <part name="X1" library="con-phoenix-254" deviceset="MPT6" device=""/>
 <part name="GND9" library="supply1" deviceset="GND" device=""/>
-<part name="P+6" library="supply1" deviceset="+5V" device=""/>
 <part name="R1" library="rcl" deviceset="R-EU_" device="0207/10" value="4k7"/>
 <part name="R2" library="rcl" deviceset="R-EU_" device="0207/10" value="4k7"/>
 <part name="+3V9" library="supply1" deviceset="+3V3" device=""/>
@@ -11116,6 +11115,7 @@ Source: http://products.nichicon.co.jp/en/pdf/XJA043/e-ud.pdf</description>
 <part name="P+8" library="supply1" deviceset="+12V" device=""/>
 <part name="GND5" library="supply1" deviceset="GND" device=""/>
 <part name="GND11" library="supply1" deviceset="GND" device=""/>
+<part name="+3V2" library="supply1" deviceset="+3V3" device=""/>
 </parts>
 <sheets>
 <sheet>
@@ -11158,7 +11158,6 @@ Source: http://products.nichicon.co.jp/en/pdf/XJA043/e-ud.pdf</description>
 <instance part="X1" gate="-5" x="116.84" y="106.68"/>
 <instance part="X1" gate="-6" x="116.84" y="101.6"/>
 <instance part="GND9" gate="1" x="109.22" y="127" rot="R270"/>
-<instance part="P+6" gate="1" x="106.68" y="116.84" rot="R90"/>
 <instance part="R1" gate="G$1" x="15.24" y="91.44" rot="R90"/>
 <instance part="R2" gate="G$1" x="22.86" y="91.44" rot="R90"/>
 <instance part="+3V9" gate="G$1" x="17.78" y="104.14"/>
@@ -11175,6 +11174,7 @@ Source: http://products.nichicon.co.jp/en/pdf/XJA043/e-ud.pdf</description>
 <instance part="P+8" gate="1" x="210.82" y="129.54"/>
 <instance part="GND5" gate="1" x="210.82" y="116.84"/>
 <instance part="GND11" gate="1" x="210.82" y="157.48"/>
+<instance part="+3V2" gate="G$1" x="104.14" y="116.84" rot="R90"/>
 </instances>
 <busses>
 </busses>
@@ -11316,11 +11316,6 @@ Source: http://products.nichicon.co.jp/en/pdf/XJA043/e-ud.pdf</description>
 <wire x1="71.12" y1="139.7" x2="71.12" y2="149.86" width="0.1524" layer="91"/>
 <pinref part="ESP32" gate="G$1" pin="5V"/>
 </segment>
-<segment>
-<pinref part="X1" gate="-3" pin="1"/>
-<pinref part="P+6" gate="1" pin="+5V"/>
-<wire x1="114.3" y1="116.84" x2="109.22" y2="116.84" width="0.1524" layer="91"/>
-</segment>
 </net>
 <net name="+3V3" class="0">
 <segment>
@@ -11404,6 +11399,11 @@ Source: http://products.nichicon.co.jp/en/pdf/XJA043/e-ud.pdf</description>
 <wire x1="22.86" y1="96.52" x2="22.86" y2="99.06" width="0.1524" layer="91"/>
 <wire x1="22.86" y1="99.06" x2="17.78" y2="99.06" width="0.1524" layer="91"/>
 <junction x="17.78" y="99.06"/>
+</segment>
+<segment>
+<pinref part="X1" gate="-3" pin="1"/>
+<pinref part="+3V2" gate="G$1" pin="+3V3"/>
+<wire x1="114.3" y1="116.84" x2="106.68" y2="116.84" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="N$2" class="0">
