@@ -46,7 +46,7 @@ void serial_init()
 	Serial.begin(BAUD_RATE);	
 	serialCheckTaskHandle = 0;
 	// create a task to check for incoming data
-	xTaskCreatePinnedToCore(	serialCheckTask,    // task
+	/*xTaskCreatePinnedToCore(	serialCheckTask,    // task
 													"serialCheckTask", // name for task
 													8192,   // size of task stack
 													NULL,   // parameters
@@ -54,7 +54,7 @@ void serial_init()
 													&serialCheckTaskHandle, 
 													0 // core
 													); 
-	
+	*/
 }
 
 
