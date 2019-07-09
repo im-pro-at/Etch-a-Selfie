@@ -61,6 +61,7 @@ void setup()
 {
   grbl_init();
 
+  
   Wire.begin(4,15);
 
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3c)) { // Address 0x3D for 128x64

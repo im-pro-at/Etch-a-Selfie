@@ -84,7 +84,7 @@ void grbl_init() {
 #ifdef ENABLE_BLUETOOTH
     bt_config.begin();
 #endif
-
+´
   // Reset system variables.
   uint8_t prior_state = sys.state;
   memset(&sys, 0, sizeof(system_t)); // Clear system struct variable.
@@ -122,7 +122,7 @@ void grbl_init() {
 	
   // Start Grbl main loop. Processes program inputs and executes them.  
   //protocol_main_loop();   
-  
+
 }
 
 void grbl_sendCMD(char *c)
