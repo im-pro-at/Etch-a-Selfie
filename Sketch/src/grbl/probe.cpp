@@ -68,7 +68,7 @@ uint8_t probe_get_state()
 // Monitors probe pin state and records the system position when detected. Called by the
 // stepper ISR per ISR tick.
 // NOTE: This function must be extremely efficient as to not bog down the stepper ISR.
-void probe_state_monitor()
+void IRAM_ATTR probe_state_monitor()
 {
   if (probe_get_state()) {
     sys_probe_state = PROBE_OFF;

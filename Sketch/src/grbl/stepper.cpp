@@ -259,7 +259,7 @@ void IRAM_ATTR onStepperDriverTimer(void *para)  // ISR It is time to take a ste
 
 	//const int timer_idx = (int)para;  // get the timer index
 
-	TIMERG0.int_clr_timers.t0 = 1;
+	TIMERG0.int_clr_timers.t0 = 1;  
 
 	if (busy) {
 		return;    // The busy-flag is used to avoid reentering this interrupt
@@ -487,7 +487,7 @@ void stepper_init()
 	timer_init(STEP_TIMER_GROUP, STEP_TIMER_INDEX, &config);
 	timer_set_counter_value(STEP_TIMER_GROUP, STEP_TIMER_INDEX, 0x00000000ULL);
 	timer_enable_intr(STEP_TIMER_GROUP, STEP_TIMER_INDEX);
-	timer_isr_register(STEP_TIMER_GROUP, STEP_TIMER_INDEX, onStepperDriverTimer, NULL, 0, NULL);
+	timer_isr_register(STEP_TIMER_GROUP, STEP_TIMER_INDEX, onStepperDriverTimer, NULL, ESP_INTR_FLAG_IRAM, NULL);
 
 
 }
@@ -639,7 +639,7 @@ void st_reset()
 
 
 
-void set_direction_pins_on(uint8_t onMask)
+void IRAM_ATTR set_direction_pins_on(uint8_t onMask)
 {
 	// inverts are applied in step generation
 #ifdef X_DIRECTION_PIN
@@ -655,7 +655,7 @@ void set_direction_pins_on(uint8_t onMask)
 
 #ifndef USE_GANGED_AXES
 // basic one motor per axis
-void set_stepper_pins_on(uint8_t onMask)
+void IRAM_ATTR set_stepper_pins_on(uint8_t onMask)
 {
 	onMask ^= settings.step_invert_mask; // invert pins as required by invert mask
 
@@ -672,7 +672,7 @@ void set_stepper_pins_on(uint8_t onMask)
 #endif
 }
 #else // we use ganged axes
-void set_stepper_pins_on(uint8_t onMask)
+void IRAM_ATTR set_stepper_pins_on(uint8_t onMask)
 {
 	onMask ^= settings.step_invert_mask; // invert pins as required by invert mask
 
@@ -723,7 +723,7 @@ void set_stepper_pins_on(uint8_t onMask)
 #endif
 
 // Stepper shutdown
-void st_go_idle()
+void IRAM_ATTR st_go_idle()
 {
 	// Disable Stepper Driver Interrupt. Allow Stepper Port Reset Interrupt to finish, if active.
 	Stepper_Timer_Stop();
@@ -1323,7 +1323,7 @@ void IRAM_ATTR Stepper_Timer_Stop()
 }
 
 
-void set_stepper_disable(uint8_t isOn)  // isOn = true // to disable
+void IRAM_ATTR set_stepper_disable(uint8_t isOn)  // isOn = true // to disable
 {
 	if (bit_istrue(settings.flags,BITFLAG_INVERT_ST_ENABLE)) {
 		isOn = !isOn;    // Apply pin invert.

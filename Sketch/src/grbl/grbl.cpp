@@ -35,7 +35,7 @@ volatile uint8_t sys_rt_exec_accessory_override; // Global realtime executor bit
 
 
 
-void grbl_init() {
+void grbl_run() {
   
   serial_init();   // Setup serial baud rate and interrupts
   settings_init(); // Load Grbl settings from EEPROM
@@ -84,53 +84,41 @@ void grbl_init() {
 #ifdef ENABLE_BLUETOOTH
     bt_config.begin();
 #endif
+  while(true ){
+    // Reset system variables.
+    uint8_t prior_state = sys.state;
+    memset(&sys, 0, sizeof(system_t)); // Clear system struct variable.
+    sys.state = prior_state;
+    sys.f_override = DEFAULT_FEED_OVERRIDE;  // Set to 100%
+    sys.r_override = DEFAULT_RAPID_OVERRIDE; // Set to 100%
+    sys.spindle_speed_ovr = DEFAULT_SPINDLE_SPEED_OVERRIDE; // Set to 100%
+    memset(sys_probe_position,0,sizeof(sys_probe_position)); // Clear probe position.
+    sys_probe_state = 0;
+    sys_rt_exec_state = 0;
+    sys_rt_exec_alarm = 0;
+    sys_rt_exec_motion_override = 0;
+    sys_rt_exec_accessory_override = 0;
 
-  // Reset system variables.
-  uint8_t prior_state = sys.state;
-  memset(&sys, 0, sizeof(system_t)); // Clear system struct variable.
-  sys.state = prior_state;
-  sys.f_override = DEFAULT_FEED_OVERRIDE;  // Set to 100%
-  sys.r_override = DEFAULT_RAPID_OVERRIDE; // Set to 100%
-  sys.spindle_speed_ovr = DEFAULT_SPINDLE_SPEED_OVERRIDE; // Set to 100%
-  memset(sys_probe_position,0,sizeof(sys_probe_position)); // Clear probe position.
-  sys_probe_state = 0;
-  sys_rt_exec_state = 0;
-  sys_rt_exec_alarm = 0;
-  sys_rt_exec_motion_override = 0;
-  sys_rt_exec_accessory_override = 0;
+    // Reset Grbl primary systems.
+    serial_reset_read_buffer(CLIENT_ALL); // Clear serial read buffer
+    
+    gc_init(); // Set g-code parser to default state  
+    
+    spindle_init();  
+    coolant_init();
+    limits_init();
+    probe_init();
+    
+    plan_reset(); // Clear block buffer and planner variables
+    st_reset(); // Clear stepper subsystem variables
+    // Sync cleared gcode and planner positions to current system position.
+    plan_sync_position();
+    gc_sync_position();
 
-  // Reset Grbl primary systems.
-  serial_reset_read_buffer(CLIENT_ALL); // Clear serial read buffer
-  
-  gc_init(); // Set g-code parser to default state  
-  
-  spindle_init();  
-  coolant_init();
-  limits_init();
-  probe_init();
-  
-  plan_reset(); // Clear block buffer and planner variables
-  st_reset(); // Clear stepper subsystem variables
-  // Sync cleared gcode and planner positions to current system position.
-  plan_sync_position();
-  gc_sync_position();
-
-   
-  
-  // put your main code here, to run repeatedly:
-  report_init_message(CLIENT_ALL);
-	
-  // Start Grbl main loop. Processes program inputs and executes them.  
-  //protocol_main_loop();   
-
-}
-
-void grbl_sendCMD(char *c)
-{
-  protocol_execute_command(c);
-}
-
-void grbl_service()
-{
-  protocol_exec_rt_system();
+    // put your main code here, to run repeatedly:
+    report_init_message(CLIENT_ALL);
+    
+    // Start Grbl main loop. Processes program inputs and executes them.  
+    protocol_main_loop();   
+  }
 }

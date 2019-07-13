@@ -36,10 +36,8 @@
 
 #define SERIAL_NO_DATA 0xff
 
-// a task to read for incoming data from serial port
-void serialCheckTask(void *pvParameters);
-
-void serialCheck();
+//put a String to GRBL
+void grbl_putString(char * s);
 
 void serial_write(uint8_t data);
 // Fetches the first byte in the serial read buffer. Called by main program.

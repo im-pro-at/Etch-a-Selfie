@@ -56,11 +56,26 @@ void readMPUData(void *pvParameter){
   
 }
 
+void grblRunner(void *pvParameter){
+  
+  grbl_run();
+  
+}
+
 
 void setup()
 {
-  grbl_init();
-
+  Serial.begin(115200);
+  
+  //run Grbl in a sperate task
+  xTaskCreatePinnedToCore(	  grblRunner,    // task
+	                            "grblRunner", // name for task
+	                            4096,   // size of task stack
+	                            NULL,   // parameters
+	                            1, // priority
+	                            NULL,
+                              0
+                          );  
   
   Wire.begin(4,15);
 
@@ -110,32 +125,32 @@ void setup()
   Serial.println();
   Serial.println(heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
   sensor_t * s = esp_camera_sensor_get();
-    /*
-    s->set_framesize(s, (framesize_t)val);
-    s->set_quality(s, val);
-    s->set_contrast(s, val);
-    s->set_brightness(s, val);
-    s->set_saturation(s, val);
-    s->set_gainceiling(s, (gainceiling_t)val);
-    s->set_colorbar(s, val);
-    s->set_whitebal(s, val);
-    s->set_gain_ctrl(s, val);
-    s->set_exposure_ctrl(s, val);
-    s->set_hmirror(s, val);
-    s->set_vflip(s, val);
-    s->set_awb_gain(s, val);
-    s->set_agc_gain(s, val);
-    s->set_aec_value(s, val);
-    s->set_aec2(s, val);
-    s->set_dcw(s, val);
-    s->set_bpc(s, val);
-    s->set_wpc(s, val);
-    s->set_raw_gma(s, val);
-    s->set_lenc(s, val);
-    s->set_special_effect(s, val);
-    s->set_wb_mode(s, val);
-    s->set_ae_level(s, val);  Serial.printf("OK1");
-    */
+    
+    // s->set_framesize(s, (framesize_t)val);
+    // s->set_quality(s, val);
+    // s->set_contrast(s, val);
+    // s->set_brightness(s, val);
+    // s->set_saturation(s, val);
+    // s->set_gainceiling(s, (gainceiling_t)val);
+    // s->set_colorbar(s, val);
+    // s->set_whitebal(s, val);
+    // s->set_gain_ctrl(s, val);
+    // s->set_exposure_ctrl(s, val);
+    // s->set_hmirror(s, val);
+    // s->set_vflip(s, val);
+    // s->set_awb_gain(s, val);
+    // s->set_agc_gain(s, val);
+    // s->set_aec_value(s, val);
+    // s->set_aec2(s, val);
+    // s->set_dcw(s, val);
+    // s->set_bpc(s, val);
+    // s->set_wpc(s, val);
+    // s->set_raw_gma(s, val);
+    // s->set_lenc(s, val);
+    // s->set_special_effect(s, val);
+    // s->set_wb_mode(s, val);
+    // s->set_ae_level(s, val);  Serial.printf("OK1");
+    
   Serial.printf("\"framesize\":%u\n", s->status.framesize);
   Serial.printf("\"quality\":%u\n", s->status.quality);
   Serial.printf("\"brightness\":%d\n", s->status.brightness);
@@ -164,39 +179,38 @@ void setup()
     
   Serial.printf("PID %d",s->id.PID);
   
-  
+
   mpu6050.begin();
   mpu6050.calcGyroOffsets(true);  
   wireMutex = xSemaphoreCreateMutex();
-  xTaskCreate(
-      &readMPUData,       
-      "readMPUData",   
-      2048,           
-      NULL,             
-      1,               
-      NULL);
+  xTaskCreatePinnedToCore(	  readMPUData,    // task
+	                            "readMPUData", // name for task
+	                            2048,   // size of task stack
+	                            NULL,   // parameters
+	                            1, // priority
+	                            NULL,
+	                            1 // core
+	                       );    
   
   
+
 }
 
-void loop()
+void loop() //runs on Core 1
 {
-
-  grbl_service();
-
-
-  camera_fb_t * fb = esp_camera_fb_get();
   
+  camera_fb_t * fb = esp_camera_fb_get();
   if (!fb) {
     Serial.printf("Camera Capture Failed");
   }  
   else{    
-  //Serial.printf("\nl=%d w=%d h=%d format=%d\n",fb->len, fb->width,fb->height,fb->format);
+
+  Serial.printf("\nl=%d w=%d h=%d format=%d\n",fb->len, fb->width,fb->height,fb->format);
     
   uint8_t * rgbbuf = (uint8_t*) heap_caps_calloc(fb->width*fb->height*3, 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     
   fmt2rgb888(fb->buf,fb->len,fb->format,rgbbuf);
-/*
+
   char * table = "$@B%8WM#*awmzcvunxr,. ";
   for(size_t y=0;y<fb->height;y+=fb->height/10){
     for(size_t x=0;x<fb->width;x+=fb->width/20){
@@ -205,21 +219,22 @@ void loop()
     }
     Serial.println();      
   }
-*/
+
   free(rgbbuf);
     
   esp_camera_fb_return(fb);    
   }
-  
   
   display.clearDisplay();
   display.setTextColor(WHITE);        // Draw white text
   display.setCursor(0,0);             // Start at top-left corner
   display.print("X: ");
   display.print(angleX);
+  Serial.println(angleX);
   display.setCursor(0,10);             // Start at top-left corner
   display.print("Y: ");
   display.print(angleY);
+  Serial.println(angleY);
   
   
   xSemaphoreTake( wireMutex, portMAX_DELAY );    
@@ -238,7 +253,7 @@ void loop()
       Serial.println();
       Serial.print("RESIVERD: ");
       Serial.println(buf);
-      grbl_sendCMD(buf);
+      grbl_putString(buf);
       Serial.println();
       Serial.println();
     
