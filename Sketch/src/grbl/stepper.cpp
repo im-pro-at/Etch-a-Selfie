@@ -1296,7 +1296,11 @@ float st_get_realtime_rate()
 
 void IRAM_ATTR Stepper_Timer_WritePeriod(uint64_t alarm_val)
 {
-	timer_set_alarm_value(STEP_TIMER_GROUP, STEP_TIMER_INDEX, alarm_val);
+	//timer_set_alarm_value(STEP_TIMER_GROUP, STEP_TIMER_INDEX, alarm_val);
+
+  TIMERG0.hw_timer[STEP_TIMER_INDEX].alarm_high = (uint32_t) (alarm_val >> 32);
+  TIMERG0.hw_timer[STEP_TIMER_INDEX].alarm_low = (uint32_t) alarm_val;
+  TIMERG0.hw_timer[STEP_TIMER_INDEX].config.alarm_en = 1;  
 }
 
 void IRAM_ATTR Stepper_Timer_Start()
