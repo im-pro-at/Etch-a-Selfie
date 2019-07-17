@@ -3,14 +3,14 @@
     <script src="jquery.min.js"></script>
     <script src="webcam.js"></script>
     <script>
-    var w=800;
-    var h=600;
+    var w=750;
+    var h=550;
 
     $(function(){
     
       Webcam.set({
-        width: w,
-        height: h,
+        width: 800,
+        height: 600,
         image_format: 'jpeg',
         jpeg_quality: 90
       });
@@ -65,10 +65,10 @@
       }
       rctx.putImageData(imageData, 0, 0);
       var ctx=$("#c")[0].getContext('2d');
-      ctx.canvas.width=800;
-      ctx.canvas.height=600;
+      ctx.canvas.width=w;
+      ctx.canvas.height=h;
       
-      ctx.drawImage(rctx.canvas,0,0,800,600,0,0,ctx.canvas.width,ctx.canvas.height);
+      ctx.drawImage(rctx.canvas,0,0,w,h,0,0,ctx.canvas.width,ctx.canvas.height);
     }
 
       setInterval(function(){
@@ -102,15 +102,25 @@
         };
         
         var canvas=$("<canvas />")[0];
-        canvas.width=w;
-        canvas.height=h;
+        canvas.width=800;
+        canvas.height=600;
         canvas.getContext('2d').drawImage(document.getElementById("image"),0,0);
+        
+
+        var imageData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
         
         var image=  new Uint8Array(new ArrayBuffer(w*h));
 
-        var imageData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
-        for (var i=0; i<canvas.width*canvas.height;i++){
-          image[i]=(imageData.data[i*4+0]*0.299+imageData.data[i*4+1]*0.587+imageData.data[i*4+2]*0.114);
+        var offsetx = ((800 -w)/2)|0;
+        var offsety = ((600 -h)/2)|0;
+        
+        for (var x=0; x<w;x++)
+        {    
+          for (var y=0; y<h;y++)
+          {
+            var i=x+offsetx+(y+offsety)*800;
+            image[x+y*w]=imageData.data[i*4+0]*0.299+imageData.data[i*4+1]*0.587+imageData.data[i*4+2]*0.114;
+          }  
         }
         
         etchWorker.postMessage([config,image]);          
@@ -449,15 +459,14 @@
         
           display("connecting",0,30);
           //we need a Line to start from:
-          for(var i=0;i<w;i++)
+          for(var i=0;i<w;i++){
             bw_set(i+(h-1)*w,1);
+          }
           
           var totalBlackPixel=0;
-          for(var y=0;y<h;y++){
-            for(var x=0;x<w;x++){
-              if(bw_get(x+y*w)==1){
-                totalBlackPixel++;
-              }
+          for(var i=0;i<w*h;i++){
+            if(bw_get(i)==1){
+              totalBlackPixel++;
             }
           }
 
@@ -466,52 +475,37 @@
           var line;
           while(true){
             //test if there is stell something left:
-            var finished=1;
+            var blackPixel=0;
             for(var i=0;i<w*h;i++){
               if(bw_get(i)==1){
-                finished=0;
-                break;
+                blackPixel++;
               }
             }
-            
-            if(finished) break;
+
+            if(blackPixel==0) break;
 
             line=searchAndConnect()          
 
-            var redPixel=0;
-            for(var y=0;y<h;y++){
-              for(var x=0;x<w;x++){
-                if(bw_get(x+y*w)==2){
-                  redPixel++;
-                }
-              }
-            }
-            display("connecting",100*redPixel/totalBlackPixel-1,30);
+            display("connecting",Math.pow(101,(totalBlackPixel-blackPixel)/totalBlackPixel)-1,30);
 
             drawLine(line[0],line[1],line[2],line[3]);
             floodFillScanlineStack(line[2],line[3]);  
           
           }
-          display("connecting",100,30);
-
           //remove boarder
-          for(var y=0;y<h;y++){
-            for(var x=0;x<w;x++){
-              if(bw_get(x+y*w)==3){
-                  bw_set(x+y*w,0);
-              }
+          for(var i=0;i<w*h;i++){
+            if(bw_get(i)==3){
+                bw_set(i,0);
             }
           }
-          display(1000);
+          display("connecting",100,30);
         
 
           display("etching",0,30);
           var totalRedPixel=0;
-          for(var y=0;y<h;y++){
-            for(var x=0;x<w;x++){
-              if(bw_get(x+y*w)==2){
-                totalRedPixel++;
-              }
+          for(var i=0;i<w*h;i++){
+            if(bw_get(i)==2){
+              totalRedPixel++;
             }
           }
           //start point
@@ -573,29 +567,25 @@
             commands+=("G1X"+cx+"Y"+cy+"\n");
             
             //find next empty spot => breadth first search
+            var readpointer=0;
+            var writepointer=0;            
             var ax=cx;
             var ay=cy;
             for (var i=0;i<w*h;i++)
               done[i]=0; // need to be cleared!
-            discoverd[0]=ax+ay*w;
-            discoverd[1]=w*h; 
-            cost[discoverd[0]]=0;
-            done[discoverd[0]]=1;
-            while (discoverd[0]!=w*h){
+            discoverd[writepointer++]=ax+ay*w;
+            cost[ax+ay*w]=0;
+            done[ax+ay*w]=1;
+            while (readpointer!=writepointer){
               //remove first element:
-              current=discoverd[0];
-              for (var i=0;;i++){
-                discoverd[i]=discoverd[i+1];
-                if(discoverd[i]==w*h){
-                  break;
-                }
-              }
+              current=discoverd[readpointer];
               //process
               ax= current%w; 
               ay= (current/w)|0;
               if(bw_get(ax+ay*w)==2){
                 break;
               }
+              readpointer=(readpointer+1)%(w*h/2)
               
               var cmin=cost[current];
               for(n=0;n<9;n++){
@@ -614,29 +604,15 @@
                 var dx=n%3==0?1:((n%3==1)?0:-1);
                 var dy=((n/3)|0)%3==0?1:((((n/3)|0)%3==1)?0:-1);
                 var next=ax+dx +(ay+dy)*w;
-                if (ax+dx>=0 && ay+dy>=0 && ax+dx<w && ay+dy<h && done[next]==0 && bw_get(ax+dx+(ay+dy)*w)!=0){
+                if (ax+dx>=0 && ay+dy>=0 && ax+dx<w && ay+dy<h && done[next]==0 && bw_get(next)!=0){
                   cost[next]=cost[current]+100; //Higher cost not visited yet!
                   done[next]=1;
-                  var c=cost[next];
-                  //add to the list
-                  for(var i=0;;i++){
-                    var note=discoverd[i];
-                    if(note==w*h || cost[note]>c){
-                      var last=next;
-                      for(j=i;;j++){
-                        var temp=discoverd[j]                  
-                        discoverd[j]=last;
-                        if(last==w*h)
-                          break;
-                        last=temp;  
-                      }                  
-                      break;
-                    }
-                  }
+                  discoverd[writepointer]=next;                  
+                  writepointer=(writepointer+1)%(w*h/2)
                 }
               }
             }
-            if(discoverd[0]==w*h){
+            if(readpointer==writepointer){
               //done all is etched
               break;
             }
@@ -714,6 +690,7 @@
     <br>Status: <span id="status"> </span>
     <br>Percent: <span id="percent"> </span>
     <br><canvas id="c" > </canvas>
+    <br><canvas id="c2" > </canvas>
     <br><input type="button" value="Access Camera" onClick="setup(); $(this).hide().next().show();"><input type="button" value="Take Snapshot" onClick="take_snapshot()" style="display:none">
     <br>gamma:<input type="text" id="g" value="0.8">
     <br>phi:<input type="text" id="p" value="0.4">

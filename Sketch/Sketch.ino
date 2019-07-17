@@ -11,6 +11,7 @@
 
 //we use GRBL as a library 
 #include "src/grbl/grbl.h"
+#include "convert.h"
 
 
 #define PWDN_GPIO_NUM     32
@@ -45,7 +46,7 @@ volatile float angleY=0;
 void readMPUData(void *pvParameter){
   
   for(;;){
-    vTaskDelay(10/portTICK_PERIOD_MS  ); //do this 100 times a secound 
+    vTaskDelay(100/portTICK_PERIOD_MS  ); //do this 10 times a secound 
     xSemaphoreTake( wireMutex, portMAX_DELAY );    
     mpu6050.update();
     xSemaphoreGive( wireMutex );
@@ -65,7 +66,7 @@ void grblRunner(void *pvParameter){
 
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin(2000000);
   
   //run Grbl in a sperate task
   xTaskCreatePinnedToCore(	  grblRunner,    // task
@@ -192,39 +193,198 @@ void setup()
 	                            1 // core
 	                       );    
   
-  
-
 }
+
+uint8_t  *bw;
+uint16_t w=750;
+uint16_t h=550;
+
+
+void statusCallback(const char *name, uint8_t percent){
+  Serial.printf("SCB:[%3d] %s \n",percent,name);
+}
+void gcodeCallback(const char *gcode){
+  Serial.printf("GCODE: %s \n",gcode);
+  grbl_putString(gcode);
+}
+
 
 void loop() //runs on Core 1
 {
-  
+  char * table = "$@B%8WM#*awmzcvunxr,. ";
+
+  //*
   camera_fb_t * fb = esp_camera_fb_get();
   if (!fb) {
     Serial.printf("Camera Capture Failed");
   }  
   else{    
 
-  Serial.printf("\nl=%d w=%d h=%d format=%d\n",fb->len, fb->width,fb->height,fb->format);
-    
-  uint8_t * rgbbuf = (uint8_t*) heap_caps_calloc(fb->width*fb->height*3, 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    
-  fmt2rgb888(fb->buf,fb->len,fb->format,rgbbuf);
-
-  char * table = "$@B%8WM#*awmzcvunxr,. ";
-  for(size_t y=0;y<fb->height;y+=fb->height/10){
-    for(size_t x=0;x<fb->width;x+=fb->width/20){
-      float v= rgbbuf[(x+y*fb->width)*3+1]*0.299+ rgbbuf[(x+y*fb->width)*3+1]*0.587 +rgbbuf[(x+y*fb->width)*3+1]*0.114;
-      Serial.print(table[(uint8_t)(v/256*21)]);
+    Serial.printf("\nl=%d w=%d h=%d format=%d\n",fb->len, fb->width,fb->height,fb->format);
+      
+    uint8_t * rgbbuf = (uint8_t*) heap_caps_calloc(fb->width*fb->height*3, 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    uint8_t  *gray    =(uint8_t*) heap_caps_calloc(w*h, 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    uint16_t *buffer1 =(uint16_t*)heap_caps_calloc(w*h*2, 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    uint16_t *buffer2 =(uint16_t*)heap_caps_calloc(w*h*2, 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    bw      =(uint8_t*) heap_caps_calloc(w*h/4+1, 1, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    uint8_t  *done    =(uint8_t*) heap_caps_calloc(w*h/8+1, 1, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+      
+    if(rgbbuf==NULL ||gray==NULL ||buffer1==NULL ||buffer2==NULL ||bw==NULL ||done==NULL)
+    {
+      Serial.println("!!!!!!!!!!!!!!!!!!MALLOC ERROR!!!!!!!!!!!!!!!!!!!");
+      delay(1000);
     }
-    Serial.println();      
-  }
 
-  free(rgbbuf);
+    Serial.println("JEPAG IMAGE DATA: ");
+    Serial.print("var image=[");
+    for(uint32_t i=0;i<fb->len;i++){
+      Serial.print(fb->buf[i]);
+      if(i!=fb->len-1)Serial.print(",");
+      
+    }
+    Serial.println("]");
+    Serial.println("var binary=\"\";");
+    Serial.println("for(var i=0;i<image.length;i++){");
+    Serial.println("    binary+=String.fromCharCode(image[i])");
+    Serial.println("}");
+    Serial.println("var base64=window.btoa(binary)");
+    Serial.println("$(\"#image\")[0].src=\"data:image/jpeg;base64,\"+base64    ");
+
+    fmt2rgb888(fb->buf,fb->len,fb->format,rgbbuf);
+
     
-  esp_camera_fb_return(fb);    
+    convert_RGB2Grayscale(fb->width, fb->height, rgbbuf, w, h, gray);
+    
+    convert_XDOG_init(w,h, statusCallback, gray, buffer1, buffer2);
+    
+    for(float gamma=0; gamma<1 ; gamma+=0.1){
+      for(float phi=0; phi<1 ; phi+=0.1){
+        Serial.printf("gamma %f phi %f \n",gamma,phi);
+        convert_XDOG(w, h, gamma, phi, buffer1, buffer2, bw);
+        
+        //dsplay
+        display.clearDisplay();
+        
+        uint8_t scale = max(w/128+1,h/64+1);
+        for(uint8_t x=0;x<128;x++) 
+        {
+          for(uint8_t y=0;y<64;y++) 
+          {
+            uint16_t count=0;
+            for(uint8_t dx=0;dx<scale;dx++)
+            {
+              for(uint8_t dy=0;dy<scale;dy++)
+              {
+                if((x*scale+dx)<w && (y*scale+dy)<h)
+                {
+                  uint32_t pos= x*scale+dx + (y*scale+dy)*w;
+                  if((bw[pos/4] >> ((pos%4)*2)) & 0b11)
+                  {
+                    count ++;
+                  }                    
+                }
+              }              
+            }
+            if(count > (scale*scale)/4) 
+            {
+              display.drawPixel(x,y,WHITE);                          
+            }
+          }          
+        }
+                
+        
+        xSemaphoreTake( wireMutex, portMAX_DELAY );    
+        display.display(); //~30ms
+        xSemaphoreGive( wireMutex );
+
+        
+      }      
+    }
+
+    
+    for(uint16_t y=0;y<h;y++){
+      Serial.print("_");      
+      for(uint16_t x=0;x<w;x++){
+        uint32_t pos =(x+y*w);
+        switch((bw[pos/4] >> ((pos%4)*2)) & 0b11){
+          case 0:
+            Serial.print(' ');
+            break;
+          case 1:
+            Serial.print('.');
+            break;
+          case 2:
+            Serial.print('*');
+            break;
+          case 3:
+            Serial.print('#');
+            break;
+        }
+      }
+      Serial.println();      
+    }
+    
+    convert_connect(w, h, statusCallback, bw, (uint32_t *) buffer1);
+
+    for(uint16_t y=0;y<h;y++){
+      Serial.print("_");      
+      for(uint16_t x=0;x<w;x++){
+        uint32_t pos =(x+y*w);
+        switch((bw[pos/4] >> ((pos%4)*2)) & 0b11){
+          case 0:
+            Serial.print(' ');
+            break;
+          case 1:
+            Serial.print('.');
+            break;
+          case 2:
+            Serial.print('*');
+            break;
+          case 3:
+            Serial.print('#');
+            break;
+        }
+      }
+      Serial.println();      
+    }
+
+    grbl_putString("G1 F10000");
+    convert_etch(w, h, statusCallback, gcodeCallback, bw, done, buffer1, (uint32_t *)buffer2, w*h/2);
+
+    for(uint16_t y=0;y<h;y++){
+      Serial.print("_");      
+      for(uint16_t x=0;x<w;x++){
+        uint32_t pos =(x+y*w);
+        switch((bw[pos/4] >> ((pos%4)*2)) & 0b11){
+          case 0:
+            Serial.print(' ');
+            break;
+          case 1:
+            Serial.print('.');
+            break;
+          case 2:
+            Serial.print('*');
+            break;
+          case 3:
+            Serial.print('#');
+            break;
+        }
+      }
+      Serial.println();      
+    }
+
+    while(1);
+    
+    free(done);
+    free(bw);
+    free(buffer2);
+    free(buffer1);
+    free(gray);
+    free(rgbbuf);
+      
+    esp_camera_fb_return(fb);    
   }
-  
+  //*/
   display.clearDisplay();
   display.setTextColor(WHITE);        // Draw white text
   display.setCursor(0,0);             // Start at top-left corner

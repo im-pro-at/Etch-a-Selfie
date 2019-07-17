@@ -43,19 +43,28 @@ static float scalelog(float scale, float min, float max)
   return exp(log(min) + (log(max)-log(min))*scale);
 }
 
-static uint8_t bw_set(uint8_t *bw, uint32_t pos, uint8_t v)
+inline static uint8_t bw_set(uint8_t *bw, uint32_t pos, uint8_t v)
 {
   uint8_t shift=(pos%4)*2;
   pos=pos/4;
   bw[pos]=(bw[pos] & (~(0b11 << shift))) | ((v & 0b11) << shift);
 }
-static uint8_t bw_get(uint8_t *bw, uint32_t pos)
+inline static uint8_t bw_get(uint8_t *bw, uint32_t pos)
 { 
-  uint8_t v=bw[pos/4];
-  if(v==0b00000000) return 0;
-  if(v==0b01010101) return 1;
-  return (v >> ((pos%4)*2)) & 0b11;
+  return (bw[pos/4] >> ((pos%4)*2)) & 0b11;
 }
+
+inline static uint8_t done_set(uint8_t *done, uint32_t pos, uint8_t v)
+{
+  uint8_t shift=pos%8;
+  pos=pos/8;
+  done[pos]=(done[pos] & (~(0b1 << shift))) | ((v & 0b1) << shift);
+}
+inline static uint8_t done_get(uint8_t *done, uint32_t pos)
+{ 
+  return (done[pos/8] >> (pos%8)) & 0b1;
+}
+
 
 //https://lodev.org/cgtutor/floodfill.html
 //The scanline floodfill algorithm using stack instead of recursion, more robust
@@ -69,7 +78,7 @@ static void floodFillScanlineStack(uint16_t w, uint16_t h, uint8_t *bw, uint32_t
     uint32_t c= stack[--pointer];
     uint16_t x=c%w;
     uint16_t y=(c/w)|0;
-    uint16_t x1 = x;
+    int16_t x1 = x;
     while(x1 >= 0 && bw_get(bw,x1+y*w) == 1) x1--;
     //8 Way:
     if(x1 > 0 && y > 0 && bw_get(bw,x1+(y-1)*w) == 1)
@@ -181,7 +190,7 @@ static s_line searchAndConnect(uint16_t w, uint16_t h, uint8_t *bw)
                   line.xs=x;
                   line.ys=y;
                   line.xe=x+dx;
-                  line.ye=x+dy;
+                  line.ye=y+dy;
                   return line;
                 }                     
               }
@@ -235,15 +244,22 @@ static void drawLine(uint16_t w, uint16_t h, uint8_t *bw, s_line line)
   }
 }
 
-void convert_RGB2Grayscale(uint16_t w, uint16_t h, uint8_t *rgb, uint8_t *gray)
+void convert_RGB2Grayscale(uint16_t rgb_w, uint16_t rgb_h, uint8_t *rgb, uint16_t gray_w, uint16_t gray_h, uint8_t *gray)
 {
-  for (size_t i=0; i<w*h;i++)
-  {
-    gray[i]=(uint8_t)(rgb[i*3+0]*0.299+rgb[i*3+1]*0.587+rgb[i*3+2]*0.114);
-  }  
+  uint16_t offsetx = (rgb_w -gray_w)/2;
+  uint16_t offsety = (rgb_h -gray_h)/2;
+  
+  for (uint16_t x=0; x<gray_w;x++)
+  {    
+    for (uint16_t y=0; y<gray_h;y++)
+    {
+      uint32_t i=x+offsetx+(y+offsety)*rgb_w;
+      gray[x+y*gray_w]=(uint8_t)(rgb[i*3+0]*0.299+rgb[i*3+1]*0.587+rgb[i*3+2]*0.114);
+    }  
+  }
 }
 
-void convert_XDOG_init(uint16_t w, uint16_t h, convert_statuscallback_t callback, uint8_t *gray, uint16_t *buffer1, uint16_t *buffer2)
+void convert_XDOG_init(uint16_t w, uint16_t h, convert_statuscallback_t statuscb, uint8_t *gray, uint16_t *buffer1, uint16_t *buffer2)
 {
   static const DRAM_ATTR float kernel[2][21] = 
   {  // 0         1        2        3        4        5       6         7       8         9        10        11        12        13       14     15       16       17       18       19      20   
@@ -258,11 +274,11 @@ void convert_XDOG_init(uint16_t w, uint16_t h, convert_statuscallback_t callback
   
   uint16_t convbuf[MAX(w,h)+kernel_half*2]; //~2kB should be ok to place on stack 
 
-  callback("filter",0);  
+  statuscb("filter",0);  
 
   for(uint8_t g=0;g<2;g++)
   {
-    for(uint16_t ls=0;ls<w*h;ls+=w)
+    for(uint32_t ls=0;ls<w*h;ls+=w)
     {
       //fill buffer            
       uint16_t v=gray[ls]*256;
@@ -284,7 +300,7 @@ void convert_XDOG_init(uint16_t w, uint16_t h, convert_statuscallback_t callback
         }
         gaus[g][ls+p]=sum;
       } 
-      callback("filter",25*ls/(w*h)+50*g);
+      if((ls/w)%(h/20)==0) statuscb("filter",25*ls/(w*h)+50*g);
     }
     
     for(uint16_t rs=0;rs<w;rs+=1)
@@ -309,10 +325,10 @@ void convert_XDOG_init(uint16_t w, uint16_t h, convert_statuscallback_t callback
         }
         gaus[g][rs+p*w]=sum;
       }          
-      callback("filter",25*rs/w+25+50*g);            
+      if(rs%(w/20)==0) statuscb("filter",25*rs/w+25+50*g);            
     }
   }
-  callback("filter",100);
+  statuscb("filter",100);
 }
 
 void convert_XDOG(uint16_t w, uint16_t h, float gamma, float phi, uint16_t *buffer1, uint16_t *buffer2, uint8_t *bw)
@@ -323,7 +339,7 @@ void convert_XDOG(uint16_t w, uint16_t h, float gamma, float phi, uint16_t *buff
   
   //calc mean:
   float mean=0;
-  for (uint16_t i=0; i<w*h;i++){
+  for (uint32_t i=0; i<w*h;i++){
     float v = (gaus[0][i]-(gamma*gaus[1][i]))/(256*256.0);
     if(v < -0.1){
       v=1.0;
@@ -335,7 +351,7 @@ void convert_XDOG(uint16_t w, uint16_t h, float gamma, float phi, uint16_t *buff
   }        
   mean=mean/(w*h);
 
-  for (uint16_t i=0; i<w*h;i++){
+  for (uint32_t i=0; i<w*h;i++){
     float v = (gaus[0][i]-(gamma*gaus[1][i]))/(256*256.0);
     if(v < -0.1){
       v=1.0;
@@ -351,16 +367,299 @@ void convert_XDOG(uint16_t w, uint16_t h, float gamma, float phi, uint16_t *buff
     }
     
   }   
+}
 
+void convert_connect(uint16_t w, uint16_t h, convert_statuscallback_t statuscb, uint8_t *bw, uint32_t *stack)
+{
+  statuscb("connecting",0);
   
+  //we need a Line to start from:
+  for(uint16_t i=0;i<w;i++)
+  {
+    bw_set(bw,i,1);
+  }
+  for(uint16_t i=0;i<w;i++)
+  {
+    bw_set(bw,i+(h-1)*w,1);
+  }
+  for(uint16_t i=0;i<h;i++)
+  {
+    bw_set(bw,i*w,1);
+  }
+  for(uint16_t i=0;i<h;i++)
+  {
+    bw_set(bw,w-1+i*w,1);
+  }
+  
+  floodFillScanlineStack(w,h,bw,stack,0,h-1);   
+            
+  uint32_t totalBlackPixel=0;
+  for(uint32_t i=0;i<w*h;i++)
+  {
+    if(bw_get(bw,i)==1)
+    {
+      totalBlackPixel++;
+    }
+  }
+  
+  for(;;)
+  {
+    //test if there is stell something left:
+    uint32_t blackPixel=0;
+    for(uint32_t i=0;i<w*h;i++)
+    {
+      if(bw_get(bw,i)==1)
+      {
+        blackPixel++;
+      }
+    }
+    if(blackPixel==0)
+    {
+      //Done
+      break;
+    } 
+    statuscb("connecting",pow(101,(totalBlackPixel-blackPixel)/(float)totalBlackPixel)-1);
+    
+    s_line line=searchAndConnect(w,h,bw); 
+
+    drawLine(w,h,bw,line);
+    floodFillScanlineStack(w,h,bw,stack,line.xe,line.ye);  
+  
+  }
+  
+  //remove boarder
+  for(uint32_t i=0;i<w*h;i++)
+  {
+    if(bw_get(bw,i)==3)
+    {
+        bw_set(bw,i,0);
+    }
+  }
+  
+  statuscb("connecting",100);  
 }
 
 
-
-
+void convert_etch(uint16_t w, uint16_t h, convert_statuscallback_t statuscb, convert_gcodecallback_t gcodecb, uint8_t *bw, uint8_t *done, uint16_t * cost, uint32_t *discoverd, uint32_t discoverd_length)
+{
+  char gcodebuffer[100];
+  statuscb("etching",0);
+  uint32_t totalRedPixel=0;
+  for(uint32_t i=0;i<w*h;i++)
+  {
+    if(bw_get(bw,i)==2)
+    {
+      totalRedPixel++;
+    }
+  }
+  //start point
+  uint16_t cx=0;
+  uint16_t cy=h-1;
+  snprintf(gcodebuffer,100,"G1 X%d Y%d",cx,cy);
+  gcodecb(gcodebuffer);
+  for(;;)
+  {
+    //search for the longest line:
+    uint16_t ndx=1;
+    uint16_t ndy=0;
+    uint16_t nlength=0;
+    for (uint8_t dir=0;dir<4;dir++)
+    {
+      uint16_t dx,dy;
+      switch(dir)
+      {
+        case 0:
+          dx=1;
+          dy=0;
+          break;
+        case 1:
+          dx=0;
+          dy=1;
+          break;
+        case 2:
+          dx=-1;
+          dy=0;
+          break;
+        case 3:
+          dx=0;
+          dy=-1;
+          break;
+      }
+      uint16_t tx=cx;
+      uint16_t ty=cy;
+      uint16_t length=0;
+      while(tx>=0 && ty>=0 && tx<w && ty<h && bw_get(bw,tx+ty*w)==2)
+      {
+        length++;
+        tx+=dx;
+        ty+=dy;
+      }
+      if(length>nlength)
+      {
+        ndx=dx;
+        ndy=dy;
+        nlength=length;
+      }                
+    }
     
+    //marke line done!
+    for(uint16_t i=0;i<nlength;i++)
+    {
+      bw_set(bw,cx+cy*w,3);
+      if(i<nlength-1)
+      {
+        cx+=ndx;
+        cy+=ndy;
+      }
+    }
 
+    //generate G code:
+    snprintf(gcodebuffer,100,"G1 X%d Y%d",cx,cy);
+    gcodecb(gcodebuffer);
+    
+    //find next empty spot => breadth first search
+    uint32_t readpointer=0;
+    uint32_t writepointer=0;            
+    uint16_t ax=cx;
+    uint16_t ay=cy;
+    uint32_t current=ax+ay*w; 
+    for (uint32_t i=0;i<w*h;i++)
+    {
+      done_set(done,i,0); // need to be cleared!      
+    }
+    discoverd[writepointer++]=current;
+    cost[current]=0;
+    done_set(done,current,1);
+    while (readpointer!=writepointer)
+    {
+      //remove first element:
+      current=discoverd[readpointer];
+      ax= current%w; 
+      ay= (current/w)|0;
 
+      if(bw_get(bw,current)==2)
+      {
+        //found next spot to echt
+        break;
+      }
+      readpointer=(readpointer+1)%discoverd_length;    
+      
+      //process
+      uint16_t cmin=cost[current];
+      for(uint8_t n=0;n<9;n++)
+      {
+        int8_t dx=n%3==0?1:((n%3==1)?0:-1);
+        int8_t dy=(n/3)%3==0?1:(((n/3)%3==1)?0:-1);
+        uint32_t next=ax+dx +(ay+dy)*w;
+        if (ax+dx>=0 && ay+dy>=0 && ax+dx<w && ay+dy<h && done_get(done,next))
+        {
+          uint16_t c=cost[next]+((dx!=0 && dy!=0)?14:10);
+          if(cmin>c)
+            cmin=c;
+        }
+      }
+      cost[current]=cmin;
+      
+      for(uint8_t n=0;n<9;n++)
+      {
+        int8_t dx=n%3==0?1:((n%3==1)?0:-1);
+        int8_t dy=(n/3)%3==0?1:(((n/3)%3==1)?0:-1);
+        uint32_t next=ax+dx+(ay+dy)*w;
+        if (ax+dx>=0 && ay+dy>=0 && ax+dx<w && ay+dy<h && 
+            done_get(done,next)==0 && bw_get(bw,next)!=0)
+        {
+          cost[next]=cost[current]+100; //Higher cost not visited yet!
+          done_set(done,next,1);
+          discoverd[writepointer]=next;                  
+          writepointer=(writepointer+1)%discoverd_length;          
+        }
+      }
+    }
+    if(readpointer==writepointer)
+    {
+      //done! all is etched
+      break;
+    }
+    
+    //Trace back;
+    discoverd[0]=current;
+    int16_t i=0;
+    for(;discoverd[i]!=cx+cy*w;i++)
+    {
+      uint16_t ax=discoverd[i]%w; 
+      uint16_t ay=discoverd[i]/w;
+if(discoverd[i]>w*h){
+snprintf(gcodebuffer,100,"OOR i %d discoverd[i] %d",i,discoverd[i]);
+statuscb(gcodebuffer,0);
+        
+} 
+      uint16_t c=cost[discoverd[i]];
+      uint8_t found=0;
+      for(uint8_t n=0;n<9;n++)
+      {
+        int8_t dx=n%3==0?1:((n%3==1)?0:-1);
+        int8_t dy=(n/3)%3==0?1:(((n/3)%3==1)?0:-1);
+        uint32_t next=ax+dx+(ay+dy)*w;
+        if ((dx!=0 || dy!=0) && ax+dx>=0 && ay+dy>=0 && 
+                                ax+dx<w  && ay+dy<h  && 
+            done_get(done,next)                         )
+        {
+          if(c>cost[next])
+          {
+            c=cost[next];
+            discoverd[i+1]=next;
+            found=1;
+          }
+        }
+      }
+if(found==0){
+snprintf(gcodebuffer,100,"NF current %d cx %d cy %d discoverd[i] %d i %d",current,cx,cy, discoverd[i], i);
+statuscb(gcodebuffer,0);
+        
+        
+}
+    }
 
+    int8_t ldx=0;
+    int8_t ldy=0;
+    for(;i>=0;i--)
+    {
+      uint16_t x=discoverd[i]%w;
+      uint16_t y=discoverd[i]/w;
+      uint16_t nx=discoverd[i+1]%w;
+      uint16_t ny=discoverd[i+1]/w;
+      int8_t dx=x-nx;
+      int8_t dy=y-ny;
+      if(ldx!=dx || ldy!=dy)
+      {
+        //generate G code:
+        snprintf(gcodebuffer,100,"G1 X%d Y%d",x,y);
+        gcodecb(gcodebuffer);
+        ldx=dx;
+        ldy=dy;
+      }
+    }  
+    
+    cx=discoverd[0]%w;
+    cy=discoverd[0]/w;
+    snprintf(gcodebuffer,100,"G1 X%d Y%d",cx,cy);
+    gcodecb(gcodebuffer);
+    
+    uint32_t greenPixel=0;
+    for(uint32_t i=0;i<w*h;i++)
+    {
+      if(bw_get(bw,i)==3)
+      {
+        greenPixel++;
+      }
+    }
+    statuscb("etching",99*greenPixel/totalRedPixel);
+    
+  }
+  
+  statuscb("etching",100);
+
+  
+}
 
 
