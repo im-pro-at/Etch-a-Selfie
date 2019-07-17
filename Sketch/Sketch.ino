@@ -7,6 +7,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <MPU6050_tockn.h>
+#include <Adafruit_ADS1015.h>
 #include <esp_camera.h>
 
 //we use GRBL as a library 
@@ -39,20 +40,91 @@ SemaphoreHandle_t wireMutex;
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire);
 MPU6050 mpu6050(Wire);
+Adafruit_ADS1115 ads;
 
 volatile float angleX=0;
 volatile float angleY=0;
 
-void readMPUData(void *pvParameter){
+volatile uint8_t jostick_press=0; //short=1, long=2
+volatile int8_t jostick_x=0;
+volatile int8_t jostick_y=0;
+
+
+
+void i2cWorker(void *pvParameter)
+{
+  TickType_t xLastWakeTime;
+  const TickType_t xFrequency = 100/portTICK_PERIOD_MS; //do this 10 times a secound 
+  int16_t adc0, adc1, adc2;
+  uint8_t taster_count=0;
   
-  for(;;){
-    vTaskDelay(100/portTICK_PERIOD_MS  ); //do this 10 times a secound 
-    xSemaphoreTake( wireMutex, portMAX_DELAY );    
-    mpu6050.update();
-    xSemaphoreGive( wireMutex );
+  xLastWakeTime = xTaskGetTickCount();
+  for(;;)
+  {
+    vTaskDelayUntil( &xLastWakeTime, xFrequency );
     
+    
+    xSemaphoreTake( wireMutex, portMAX_DELAY );    
+    
+    mpu6050.update();    
+    adc0 = ads.readADC_SingleEnded(0); 
+    adc1 = ads.readADC_SingleEnded(1);
+    adc2 = ads.readADC_SingleEnded(2);
+    
+    xSemaphoreGive( wireMutex );
+
     angleX=mpu6050.getAngleX();
-    angleY=mpu6050.getAngleY();    
+    angleY=mpu6050.getAngleY();  
+
+    //adc0 Taster open ~ 17000 closed ~10
+    if(adc0 < 8000)
+    {
+      //pressed
+      taster_count++;
+    }
+    else
+    {
+      // not pressed
+      if(taster_count!=0)
+      {
+        if(taster_count>10)
+        { //>1 sec
+          jostick_press=2; //long 
+        }
+        else{
+          jostick_press=1; //short 
+        }
+        taster_count=0;
+      }
+    }
+    
+    //adc2 right 1700 middle 8682 left 0
+    if(adc2 < 7400)
+    {
+      jostick_x = -1; //left
+    }
+    else if(adc2 > 10500)
+    {
+      jostick_x = 1; //right   
+    }
+    else{
+      jostick_x = 0;            
+    }
+    //adc1 up ~1700 middle ~9140 down ~0
+    if(adc1 < 7400)
+    {
+      jostick_y = 1; //down
+    }
+    else if(adc1 > 10500)
+    {
+      jostick_y = -1; //up     
+    }
+    else{
+      jostick_y = 0;            
+    }
+    
+    Serial.printf("x %d y %d press %d \n",jostick_x,jostick_y,jostick_press);
+    
   }    
   
 }
@@ -183,9 +255,12 @@ void setup()
 
   mpu6050.begin();
   mpu6050.calcGyroOffsets(true);  
+  
+  ads.begin();
+  
   wireMutex = xSemaphoreCreateMutex();
-  xTaskCreatePinnedToCore(	  readMPUData,    // task
-	                            "readMPUData", // name for task
+  xTaskCreatePinnedToCore(	  i2cWorker,    // task
+	                            "i2cWorker", // name for task
 	                            2048,   // size of task stack
 	                            NULL,   // parameters
 	                            1, // priority
@@ -372,8 +447,6 @@ void loop() //runs on Core 1
       }
       Serial.println();      
     }
-
-    while(1);
     
     free(done);
     free(bw);
