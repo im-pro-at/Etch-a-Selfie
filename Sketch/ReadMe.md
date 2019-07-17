@@ -9,3 +9,19 @@
 
 Later Version may work but are not tested ...
 
+# Settings
+
+| Name                | Setting               |
+| ------------------- | --------------------- |
+| Board               | ESP32 Wrover Module   |
+| Upload Speed        | 921600                |
+| Flash Frequency     | 80MHz                 |
+| Flash Mode          | QIO                   |
+| Partion Scheme      | Huge APP (3Mb No OTA) |
+| Core Debug Level    | None                  |
+
+#Flashing
+
+Look [here](https://github.com/raphaelbs/esp32-cam-ai-thinker#flashing) 
+
+
