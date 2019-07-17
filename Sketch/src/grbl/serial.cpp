@@ -129,13 +129,11 @@ static void serialPutByte(uint8_t data)
           if (next_head != serial_rx_buffer_tail[client_idx]) {
             serial_rx_buffer[client_idx][serial_rx_buffer_head[client_idx]] = data;
             serial_rx_buffer_head[client_idx] = next_head;
-            Serial.print("o");
             break;
           }		
           else{
             xSemaphoreGive( serialMutex );            
             vTaskDelay(1); //Wait one tick and try again
-            Serial.print("f");
             xSemaphoreTake( serialMutex, portMAX_DELAY );                
           }
           
@@ -147,7 +145,7 @@ static void serialPutByte(uint8_t data)
     COMMANDS::handle();
 }
 
-void grbl_putString(char * s)
+void grbl_putString(const char * s)
 {
   int i=0;
   while(s[i]!=0)
@@ -168,17 +166,7 @@ void serial_reset_read_buffer(uint8_t client)
 		{
 			serial_rx_buffer_tail[client_num-1] = serial_rx_buffer_head[client_num-1];
 		}
-	}		
-
-    grbl_putString("G0X100");
-    grbl_putString("G0X0");
-    grbl_putString("G0X100");
-    grbl_putString("G0X0");
-    grbl_putString("G0X100");
-    grbl_putString("G0X0");
-    grbl_putString("G0X100");
-    grbl_putString("G0X0");
-  
+	}		  
 }
 
 // Writes one byte to the TX serial buffer. Called by main program.
@@ -194,7 +182,7 @@ uint8_t serial_read(uint8_t client)
   if (serial_rx_buffer_head[client_idx] == tail) {
     return SERIAL_NO_DATA;
   } else {
-    Serial.print("t"); vTaskDelay(1); //Wait one tick and try again
+    vTaskDelay(1); //Wait one tick and try again
     
     xSemaphoreTake( serialMutex, portMAX_DELAY );    
     

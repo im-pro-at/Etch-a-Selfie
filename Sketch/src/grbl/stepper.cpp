@@ -104,10 +104,6 @@ static volatile uint8_t busy;
 static plan_block_t *pl_block;     // Pointer to the planner block being prepped
 static st_block_t *st_prep_block;  // Pointer to the stepper block data being prepped
 
-// esp32 work around for diable in main loop
-uint64_t stepper_idle_counter; // used to count down until time to disable stepper drivers
-bool stepper_idle;
-
 // Segment preparation data struct. Contains all the necessary information to compute new segments
 // based on the current executing planner block.
 typedef struct {
@@ -458,13 +454,6 @@ void stepper_init()
 	#endif
 
 
-
-	// make the stepper disable pin an output
-	#ifdef STEPPERS_DISABLE_PIN
-		pinMode(STEPPERS_DISABLE_PIN, OUTPUT);
-		set_stepper_disable(true);
-	#endif
-
 // setup stepper timer interrupt
 
 	/*
@@ -585,13 +574,6 @@ void st_wake_up()
 #ifdef ESP_DEBUG
 	//Serial.println("st_wake_up()");
 #endif
-
-	// Enable stepper drivers.
-	set_stepper_disable(false);
-
-	stepper_idle = false;
-
-
 
 	// Initialize stepper output bits to ensure first ISR call does not step.
 	st.step_outbits = step_port_invert_mask;
@@ -728,24 +710,6 @@ void IRAM_ATTR st_go_idle()
 	// Disable Stepper Driver Interrupt. Allow Stepper Port Reset Interrupt to finish, if active.
 	Stepper_Timer_Stop();
 	busy = false;
-
-	bool pin_state = false;
-	// Set stepper driver idle state, disabled or enabled, depending on settings and circumstances.
-	if (((settings.stepper_idle_lock_time != 0xff) || sys_rt_exec_alarm || sys.state == STATE_SLEEP) && sys.state != STATE_HOMING) {
-
-
-		// Force stepper dwell to lock axes for a defined amount of time to ensure the axes come to a complete
-		// stop and not drift from residual inertial forces at the end of the last movement.
-
-		stepper_idle = true; // esp32 work around for disable in main loop
-		stepper_idle_counter = esp_timer_get_time() + (settings.stepper_idle_lock_time * 1000); // * 1000 because the time is in uSecs
-
-
-		//vTaskDelay(settings.stepper_idle_lock_time / portTICK_PERIOD_MS);	// this probably does not work when called from ISR
-		//pin_state = true;
-	} else {
-		set_stepper_disable(pin_state);
-	}
 
 	set_stepper_pins_on(0);
 }
@@ -1324,18 +1288,6 @@ void IRAM_ATTR Stepper_Timer_Stop()
 
 	timer_pause(STEP_TIMER_GROUP, STEP_TIMER_INDEX);
 
-}
-
-
-void IRAM_ATTR set_stepper_disable(uint8_t isOn)  // isOn = true // to disable
-{
-	if (bit_istrue(settings.flags,BITFLAG_INVERT_ST_ENABLE)) {
-		isOn = !isOn;    // Apply pin invert.
-	}
-
-#ifdef STEPPERS_DISABLE_PIN
-	digitalWrite(STEPPERS_DISABLE_PIN, isOn );
-#endif
 }
 
 bool get_stepper_disable()   // returns true if steppers are disabled
