@@ -1807,6 +1807,7 @@ Please make sure your boards conform to these design rules.
 </polygon>
 <contactref element="C1" pad="-"/>
 <contactref element="C2" pad="-"/>
+<contactref element="JOYSTICK" pad="GND"/>
 </signal>
 <signal name="+12V">
 <contactref element="CN1" pad="PWR"/>

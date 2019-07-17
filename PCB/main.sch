@@ -11116,6 +11116,7 @@ Source: http://products.nichicon.co.jp/en/pdf/XJA043/e-ud.pdf</description>
 <part name="GND5" library="supply1" deviceset="GND" device=""/>
 <part name="GND11" library="supply1" deviceset="GND" device=""/>
 <part name="+3V2" library="supply1" deviceset="+3V3" device=""/>
+<part name="GND12" library="supply1" deviceset="GND" device=""/>
 </parts>
 <sheets>
 <sheet>
@@ -11175,6 +11176,7 @@ Source: http://products.nichicon.co.jp/en/pdf/XJA043/e-ud.pdf</description>
 <instance part="GND5" gate="1" x="210.82" y="116.84"/>
 <instance part="GND11" gate="1" x="210.82" y="157.48"/>
 <instance part="+3V2" gate="G$1" x="104.14" y="116.84" rot="R90"/>
+<instance part="GND12" gate="1" x="73.66" y="76.2"/>
 </instances>
 <busses>
 </busses>
@@ -11271,6 +11273,12 @@ Source: http://products.nichicon.co.jp/en/pdf/XJA043/e-ud.pdf</description>
 <segment>
 <pinref part="C2" gate="G$1" pin="-"/>
 <pinref part="GND11" gate="1" pin="GND"/>
+</segment>
+<segment>
+<pinref part="GND12" gate="1" pin="GND"/>
+<wire x1="73.66" y1="78.74" x2="73.66" y2="83.82" width="0.1524" layer="91"/>
+<pinref part="JOYSTICK" gate="G$1" pin="GND"/>
+<wire x1="73.66" y1="83.82" x2="88.9" y2="83.82" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="+12V" class="0">
