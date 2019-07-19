@@ -42,26 +42,26 @@ void servo_init()
 	servo_pen_enable = false;  // start delay has not completed yet.
 
 	// setup PWM channel
-	ledcSetup(SERVO_PEN_CHANNEL_NUM, SERVO_PULSE_FREQ, SERVO_PULSE_RES_BITS);
-	ledcAttachPin(SERVO_PEN_PIN, SERVO_PEN_CHANNEL_NUM);
+	//ledcSetup(SERVO_PEN_CHANNEL_NUM, SERVO_PULSE_FREQ, SERVO_PULSE_RES_BITS);
+	//ledcAttachPin(SERVO_PEN_PIN, SERVO_PEN_CHANNEL_NUM);
 
 	servo_disable(); // start it it off
 
 	// setup a task that will calculate the determine and set the servo position
-	xTaskCreatePinnedToCore(	servoSyncTask,    // task
+	/*xTaskCreatePinnedToCore(	servoSyncTask,    // task
 	                            "servoSyncTask", // name for task
 	                            4096,   // size of task stack
 	                            NULL,   // parameters
 	                            1, // priority
 	                            &servoSyncTaskHandle,
 	                            0 // core
-	                       );
+	                       );*/
 }
 
 // turn off the PWM (0 duty) to prevent servo jitter when not in use.
 void servo_disable()
 {
-	ledcWrite(SERVO_PEN_CHANNEL_NUM, 0);
+	//ledcWrite(SERVO_PEN_CHANNEL_NUM, 0);
 }
 
 // Grbl settings are used to calibrate the servo positions
@@ -163,15 +163,15 @@ void calc_pen_servo(float penZ)
 	servo_pen_pulse_len = (uint32_t)mapConstrain(penZ, SERVO_PEN_RANGE_MIN_MM, SERVO_PEN_RANGE_MAX_MM, servo_pen_pulse_min, servo_pen_pulse_max );
 
 	// skip setting value if it is unchanged
-	if (ledcRead(SERVO_PEN_CHANNEL_NUM) == servo_pen_pulse_len)
+	//if (ledcRead(SERVO_PEN_CHANNEL_NUM) == servo_pen_pulse_len)
 		return;
   	
 	// update the PWM value
 	// ledcWrite appears to have issues with interrupts, so make this a critical section
-	portMUX_TYPE myMutex = portMUX_INITIALIZER_UNLOCKED;
+	/*portMUX_TYPE myMutex = portMUX_INITIALIZER_UNLOCKED;
 	taskENTER_CRITICAL(&myMutex);
 	ledcWrite(SERVO_PEN_CHANNEL_NUM, servo_pen_pulse_len);
-	taskEXIT_CRITICAL(&myMutex);
+	taskEXIT_CRITICAL(&myMutex);*/
 }
 
 #endif
