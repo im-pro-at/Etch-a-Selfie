@@ -500,10 +500,8 @@ uint8_t convert_connect(uint16_t w, uint16_t h, convert_statuscallback_t statusc
 }
 
 
-uint8_t convert_etch(uint16_t w, uint16_t h, convert_statuscallback_t statuscb, convert_gcodecallback_t gcodecb, uint8_t *bw, uint8_t *done, uint16_t * cost, uint32_t *discoverd, uint32_t discoverd_length)
+uint8_t convert_etch(uint16_t w, uint16_t h, convert_statuscallback_t statuscb,  convert_movecallback_t movecb, uint8_t *bw, uint8_t *done, uint16_t * cost, uint32_t *discoverd, uint32_t discoverd_length)
 {
-  char gcodebuffer[100];
-
   if(statuscb!=NULL) 
   {
     if(statuscb("etching",0))
@@ -523,8 +521,8 @@ uint8_t convert_etch(uint16_t w, uint16_t h, convert_statuscallback_t statuscb, 
   //start point
   uint16_t cx=0;
   uint16_t cy=h-1;
-  snprintf(gcodebuffer,100,"G1 X%d Y%d",cx,cy);
-  gcodecb(gcodebuffer);
+  movecb(cx,cy);
+
   for(;;)
   {
     //search for the longest line:
@@ -582,8 +580,7 @@ uint8_t convert_etch(uint16_t w, uint16_t h, convert_statuscallback_t statuscb, 
     }
 
     //generate G code:
-    snprintf(gcodebuffer,100,"G1 X%d Y%d",cx,cy);
-    gcodecb(gcodebuffer);
+    movecb(cx,cy);
     
     //find next empty spot => breadth first search
     uint32_t readpointer=0;
@@ -690,8 +687,7 @@ uint8_t convert_etch(uint16_t w, uint16_t h, convert_statuscallback_t statuscb, 
       if(ldx!=dx || ldy!=dy)
       {
         //generate G code:
-        snprintf(gcodebuffer,100,"G1 X%d Y%d",x,y);
-        gcodecb(gcodebuffer);
+        movecb(x,y);
         ldx=dx;
         ldy=dy;
       }
@@ -699,8 +695,7 @@ uint8_t convert_etch(uint16_t w, uint16_t h, convert_statuscallback_t statuscb, 
     
     cx=discoverd[0]%w;
     cy=discoverd[0]/w;
-    snprintf(gcodebuffer,100,"G1 X%d Y%d",cx,cy);
-    gcodecb(gcodebuffer);
+    movecb(cx,cy);
     
     uint32_t greenPixel=0;
     for(uint32_t i=0;i<w*h;i++)

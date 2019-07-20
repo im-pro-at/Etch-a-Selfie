@@ -177,6 +177,65 @@
 //		#define CONTROL_FEED_HOLD_PIN     GPIO_NUM_36  // needs external pullup 
 //		#define CONTROL_CYCLE_START_PIN   GPIO_NUM_39  // needs external pullup    		
 		
+    
+    
+		#ifdef DEFAULTS_GENERIC 
+			#undef DEFAULTS_GENERIC  // undefine generic then define each default below
+		#endif
+		
+		// defaults
+		#define DEFAULT_STEP_PULSE_MICROSECONDS 3 
+		#define DEFAULT_STEPPER_IDLE_LOCK_TIME 250 // stay on
+		
+		#define DEFAULT_STEPPING_INVERT_MASK 0 // uint8_t
+		#define DEFAULT_DIRECTION_INVERT_MASK 0 // uint8_t
+		#define DEFAULT_INVERT_ST_ENABLE 0 // boolean
+		#define DEFAULT_INVERT_LIMIT_PINS 1 // boolean
+		#define DEFAULT_INVERT_PROBE_PIN 0 // boolean 
+		
+		#define DEFAULT_STATUS_REPORT_MASK 1
+		
+		#define DEFAULT_JUNCTION_DEVIATION 0.01 // mm
+		#define DEFAULT_ARC_TOLERANCE 0.002 // mm
+		#define DEFAULT_REPORT_INCHES 0 // false
+		
+		#define DEFAULT_SOFT_LIMIT_ENABLE 0 // false
+		#define DEFAULT_HARD_LIMIT_ENABLE 0  // false
+		
+		#define DEFAULT_HOMING_ENABLE 0  
+		#define DEFAULT_HOMING_DIR_MASK 0 // move positive dir Z, negative X,Y
+		#define DEFAULT_HOMING_FEED_RATE 200.0 // mm/min
+		#define DEFAULT_HOMING_SEEK_RATE 1000.0 // mm/min
+		#define DEFAULT_HOMING_DEBOUNCE_DELAY 250 // msec (0-65k)
+		#define DEFAULT_HOMING_PULLOFF 3.0 // mm
+
+		#define DEFAULT_SPINDLE_RPM_MAX 1000.0 // rpm
+		#define DEFAULT_SPINDLE_RPM_MIN 0.0 // rpm
+		
+		#define DEFAULT_LASER_MODE 0 // false
+		
+    //Step Angle 1.8° => 200 step/turn *32 microstepps => 6400 steps/trun 
+    //x 4.25 truns == 150mm  =>   35.2 mm/trun  
+    //y 3 turns    == 110mm  =>   36.6 mm/trun
+    // => ~36 mm/trun  => 177.7 steps/mm
+    // 1mm => 4 pixsel => 44.44 steps/pixel
+    
+		#define DEFAULT_X_STEPS_PER_MM 44.44  
+		#define DEFAULT_Y_STEPS_PER_MM 44.44
+		#define DEFAULT_Z_STEPS_PER_MM 100.0 
+		
+		#define DEFAULT_X_MAX_RATE 30000.0 // mm/min
+		#define DEFAULT_Y_MAX_RATE 30000.0 // mm/min
+		#define DEFAULT_Z_MAX_RATE 5000.0 // mm/min
+		
+		#define DEFAULT_X_ACCELERATION (50.0*60*60) // 10*60*60 mm/min^2 = 10 mm/sec^2
+		#define DEFAULT_Y_ACCELERATION (50.0*60*60) // 10*60*60 mm/min^2 = 10 mm/sec^2
+		#define DEFAULT_Z_ACCELERATION (50.0*60*60) 
+		
+		#define DEFAULT_X_MAX_TRAVEL 300.0 // mm NOTE: Must be a positive value.
+		#define DEFAULT_Y_MAX_TRAVEL 300.0 // mm NOTE: Must be a positive value.
+		#define DEFAULT_Z_MAX_TRAVEL 100.0 // This is percent in servo mode...used for calibration
+    
 #endif
 
 

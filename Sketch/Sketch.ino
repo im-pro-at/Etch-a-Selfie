@@ -36,11 +36,22 @@
 #define SCREEN_WIDTH  128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
+#define EAS_W 600 //150mm *4
+#define EAS_H 440 //110mm *4
+
+
 SemaphoreHandle_t wireMutex;
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire);
 MPU6050 mpu6050(Wire);
 Adafruit_ADS1115 ads;
+
+int16_t gx=0;
+int16_t gy=0;
+
+uint8_t calibrated=1;
+float cal_x=1;
+float cal_y=1;
 
 volatile float angleX=0;
 volatile float angleY=0;
@@ -119,6 +130,15 @@ void i2cWorker(void *pvParameter)
         if(taster_count>10)
         { //>1 sec
           jostick_press=2; //long 
+
+          //We want the show that immediately 
+          display.setTextColor(INVERSE); 
+          display.setTextSize(2);
+          display.setCursor(5,20);
+          display.print("Canceling");
+          updateDisplay();
+          
+          
         }
         else{
           jostick_press=1; //short 
@@ -269,69 +289,133 @@ void setup()
   
 }
 
+void setGlobalPosition(int16_t x, int16_t y)
+{
+  gx=x;
+  gy=y;
+  char gcode[100];
+  snprintf(gcode,100,"G92 X%f Y%f",x*cal_x,y*cal_y);
+  Serial.printf("GCODE: %s \n",gcode);
+  grbl_putString(gcode);
+}
 
+void doAmove(int16_t x, int16_t y)
+{
+  gx=x;
+  gy=y;
+  char gcode[100];
+  snprintf(gcode,100,"G1 X%f Y%f F6000",x*cal_x,y*cal_y);
+  Serial.printf("GCODE: %s \n",gcode);
+  grbl_putString(gcode);
+}
 
-void loop() //runs on Core 1
-{  
-  static uint8_t marked=0;
-  //    0  |  1
-  //  -----|----
-  //    2  |  3
-  
-  if(jostick_y==1 && marked==0)  marked=2;
-  if(jostick_y==1 && marked==1)  marked=3;
-  if(jostick_y==-1&& marked==2)  marked=0;
-  if(jostick_y==-1&& marked==3)  marked=1;
-  if(jostick_x==1 && marked==0)  marked=1;
-  if(jostick_x==1 && marked==2)  marked=3;
-  if(jostick_x==-1&& marked==1)  marked=0;
-  if(jostick_x==-1&& marked==3)  marked=2;
-  
-  if(jostick_press==1) 
+void manualControl(uint8_t mode, uint8_t limits_off)
+{
+  char gcode[100];
+  while(1)
   {
-    jostick_press=0;
-    switch(marked)
+    int16_t x,y;
+    switch(mode)
     {
-      case 0: //Calibration
-        break;
-      case 1: //Selfie
-        takeAselfie();
-        break;
-      case 2: //Jostick
-        break;
-      case 3: //Acceloration
+      case 0: //jostick
+        x=jostick_x;
+        y=jostick_y;
         break;
     }
+
+    if(x!=0 || y!=0)
+    {
+      doAmove(gx+x,gy+y);            
+    }
+        
+    if(x!=0 && y!=0)
+    {
+      delay(14);      
+    }
+    else
+    {
+      delay(10);            
+    }
+
+    if(jostick_press)
+    {
+      break;
+    }
   }
-  if(jostick_press==2) jostick_press=0;
-  
-  
-  //draw menue:
+}
+
+void calibrate()
+{    
+  calibrated=0;
+  cal_x=1;
+  cal_y=1;
+
+  setGlobalPosition(0,0);
+
+
   display.clearDisplay();
   display.setTextColor(WHITE); 
+  display.setCursor(10,5);
+  display.setTextSize(2);
+  display.print("calibrate");
+  display.setCursor(5,30);
   display.setTextSize(1);
+               //1234567890123456789
+  display.print("with the joystick");
+  display.setCursor(5,38);
+  display.print("move the point in");
+  display.setCursor(5,46);
+  display.print("the bottom left");
+  display.setCursor(5,54);
+  display.print("corner");
 
-  display.drawLine(0,SCREEN_HEIGHT/2,SCREEN_WIDTH,SCREEN_HEIGHT/2,WHITE);
-  display.drawLine(SCREEN_WIDTH/2,0,SCREEN_WIDTH/2,SCREEN_HEIGHT,WHITE);
-
-  
-  display.setCursor(0,12);        
-  display.print("   Cal.   ");
-  display.setCursor(SCREEN_WIDTH/2,12);        
-  display.print("  Selfie  ");
-  display.setCursor(0,SCREEN_HEIGHT/2+12);        
-  display.print("  Jostick ");
-  display.setCursor(SCREEN_WIDTH/2,SCREEN_HEIGHT/2+12);        
-  display.print("   Hand   ");
-  
-  
-  display.fillRect((marked%2==0)?0:(SCREEN_WIDTH/2+1),(marked<2)?0:(SCREEN_HEIGHT/2+1),SCREEN_WIDTH/2,SCREEN_HEIGHT/2,INVERSE);
-  
   updateDisplay();
   
-  delay(100);
+  manualControl(0,1); //jostick mode no limites
+    
+  if(jostick_press==2){
+    jostick_press=0;
+    return;
+  }
+  jostick_press=0;
+  int16_t blc_x=gx;
+  int16_t blc_y=gy;
+  
+  display.clearDisplay();
+  display.setTextColor(WHITE); 
+  display.setCursor(10,5);
+  display.setTextSize(2);
+  display.print("calibrate");
+  display.setCursor(5,30);
+  display.setTextSize(1);
+               //1234567890123456789
+  display.print("now move the point");
+  display.setCursor(5,38);
+  display.print("in the top right");
+  display.setCursor(5,46);
+  display.print("corner without");
+  display.setCursor(5,54);
+  display.print("hitting it");
+  updateDisplay();
+  
+  
+  manualControl(0,1); //jostick mode no limites
+  int16_t trc_x=gx;
+  int16_t trc_y=gy;
+  
+  calibrated=1;
+  cal_x=EAS_W/(trc_x-blc_x);
+  cal_y=EAS_H/(blc_y-trc_x);
+  
+  if(cal_x<0.8 || cal_x>1.2 || cal_x<0.8 || cal_x>1.2 )
+  {
+    printError("calibration way off");
+  }
+  
+  setGlobalPosition(0,EAS_W);
   
 }
+
 
 void doGammaPhi(char * s1, char *s2, float *gamma, float *phi)
 {
@@ -369,22 +453,18 @@ void doGammaPhi(char * s1, char *s2, float *gamma, float *phi)
 uint8_t progressCallBack(const char *name, uint8_t percent)
 {
   static uint8_t lastpercent=101;
-  display.clearDisplay();
   if(jostick_press==2)
   {
-    //canceling
-    display.setTextColor(WHITE); 
-    display.setTextSize(2);
-    display.setCursor(5,20);
-    display.print("Canceling");
-    updateDisplay();
+    jostick_press=0;
     return 1;
   }
   if(lastpercent==percent) 
   {
-    return 1;
+    return 0;
   }
   lastpercent=percent;
+
+  display.clearDisplay();
   display.setTextColor(WHITE); 
   display.setTextSize(2);
   display.setCursor(5,5);
@@ -403,14 +483,9 @@ uint8_t progressCallBack(const char *name, uint8_t percent)
   return 0;
 }
 
+
 void takeAselfie()
-{
-  for(int i=0;i<=100;i++)
-  {
-    progressCallBack("TEST..",i);
-    delay(100);
-  }
-  
+{  
   display.clearDisplay();
   display.setTextColor(WHITE); 
   display.setTextSize(2);
@@ -441,10 +516,11 @@ void takeAselfie()
   {
       printError("Malloc");
   }
+  jostick_press=0;
   while(1)
   {
     camera_fb_t *fb = esp_camera_fb_get();
-    if (fb==NULL || fb->width!=120 || fb->height!=88) {
+    if (fb==NULL || fb->width!=160 || fb->height!=120) {
       printError("Camera Capture Failed");
     }  
     Serial.printf("\nl=%d w=%d h=%d format=%d\n",fb->len, fb->width,fb->height,fb->format);
@@ -494,7 +570,7 @@ void takeAselfie()
 
   if(jostick_press==2){
     jostick_press=0;
-    return;
+    return; //we can return here no unfreed resrouces!
   }
   jostick_press=0;
   
@@ -518,9 +594,9 @@ void takeAselfie()
     printError("Camera Capture Failed");
   }  
   Serial.printf("\nl=%d w=%d h=%d format=%d\n",fb->len, fb->width,fb->height,fb->format);
-    
-  w=600; //150mm *4
-  h=440; //110mm *4
+  uint8_t canceled=0;
+  w=EAS_W;
+  h=EAS_H;
   rgbbuf          =(uint8_t*) heap_caps_calloc(fb->width*fb->height*3, 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   gray            =(uint8_t*) heap_caps_calloc(w*h, 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   buffer1         =(uint16_t*)heap_caps_calloc(w*h*2, 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -530,22 +606,184 @@ void takeAselfie()
       
   if(rgbbuf==NULL ||gray==NULL ||buffer1==NULL ||buffer2==NULL ||bw==NULL ||done==NULL)
   {
-      printError("Malloc");
+    printError("Malloc");
   }
   
+  fmt2rgb888(fb->buf,fb->len,fb->format,rgbbuf);
   
+  convert_RGB2Grayscale(fb->width, fb->height, rgbbuf, w, h, gray);
+  
+  if(!convert_XDOG_init(w,h, progressCallBack, gray, buffer1, buffer2))
+  {
+    canceled=1;
+  }
+  
+  jostick_press=0;
+  while(canceled==0)
+  {
+    convert_XDOG(w, h, gamma, phi, buffer1, buffer2, bw);
+    
+    //dsplay
+    display.clearDisplay();
+    uint8_t scale = max(w/128+1,h/64+1);
+    for(uint8_t x=0;x<128;x++) 
+    {
+      for(uint8_t y=0;y<64;y++) 
+      {
+        uint16_t count=0;
+        for(uint8_t dx=0;dx<scale;dx++)
+        {
+          for(uint8_t dy=0;dy<scale;dy++)
+          {
+            if((x*scale+dx)<w && (y*scale+dy)<h)
+            {
+              uint32_t pos= x*scale+dx + (y*scale+dy)*w;
+              if((bw[pos/4] >> ((pos%4)*2)) & 0b11)
+              {
+                count ++;
+              }                    
+            }
+          }              
+        }
+        if(count > (scale*scale)/4) 
+        {
+          display.drawPixel(x,y,WHITE);                          
+        }
+      }          
+    }
+                        
+    doGammaPhi("Fine","Adjust",&gamma,&phi);
+    updateDisplay();
 
+    if(jostick_press){
+      break;
+    } 
+  }    
+  
+  if(jostick_press==2)
+  {
+    canceled=1;
+  }
+  jostick_press=0;
+  
+  
+  if(!canceled)
+  {
+    if(!convert_connect(w, h, progressCallBack, bw, (uint32_t *) buffer1))
+    {
+      canceled=1;
+    }
+  }
+
+  if(!canceled)
+  {
+    convert_etch(w, h, progressCallBack, doAmove, bw, done, buffer1, (uint32_t *)buffer2, w*h/2);
+  }
+  
+  free(done);
+  free(bw);
+  free(buffer2);
+  free(buffer1);
+  free(gray);
+  free(rgbbuf);
+
+  esp_camera_fb_return(fb);    
+
+}
+
+void loop() //runs on Core 1
+{  
+  static uint8_t marked=0;
+  //    0  |  1
+  //  -----|----
+  //    2  |  3
+  
+  if(jostick_y==1 && marked==0)  marked=2;
+  if(jostick_y==1 && marked==1)  marked=3;
+  if(jostick_y==-1&& marked==2)  marked=0;
+  if(jostick_y==-1&& marked==3)  marked=1;
+  if(jostick_x==1 && marked==0)  marked=1;
+  if(jostick_x==1 && marked==2)  marked=3;
+  if(jostick_x==-1&& marked==1)  marked=0;
+  if(jostick_x==-1&& marked==3)  marked=2;
+  if(!calibrated) marked=0;
+  
+  if(jostick_press==1) 
+  {
+    jostick_press=0;
+    switch(marked)
+    {
+      case 0: //Calibration
+        calibrate();
+        break;
+      case 1: //Selfie
+        takeAselfie();
+        break;
+      case 2: //Jostick
+        break;
+      case 3: //Acceloration
+        break;
+    }
+  }
+  if(jostick_press==2) jostick_press=0;
+  
+  
+  //draw menue:
+  display.clearDisplay();
+  display.setTextColor(WHITE); 
+  display.setTextSize(1);
+
+  display.drawLine(0,SCREEN_HEIGHT/2,SCREEN_WIDTH,SCREEN_HEIGHT/2,WHITE);
+  display.drawLine(SCREEN_WIDTH/2,0,SCREEN_WIDTH/2,SCREEN_HEIGHT,WHITE);
+
+  display.setCursor(0,12);        
+  display.print("   Cal.   ");
+  display.setCursor(SCREEN_WIDTH/2,12);        
+  display.print("  Selfie  ");
+  display.setCursor(0,SCREEN_HEIGHT/2+12);        
+  display.print("  Jostick ");
+  display.setCursor(SCREEN_WIDTH/2,SCREEN_HEIGHT/2+12);        
+  display.print("   Hand   ");
+
+  if(!calibrated)
+  {
+    for(int i=0;i<3;i++)
+    {
+      uint8_t offsertx=0;
+      uint8_t offserty=0;
+      switch(i)
+      {
+          case 0:
+            offsertx=SCREEN_WIDTH/2;
+            offserty=0;
+            break;
+          case 1:
+            offsertx=SCREEN_WIDTH/2;
+            offserty=SCREEN_HEIGHT/2;
+            break;
+          case 2:
+            offsertx=0;
+            offserty=SCREEN_HEIGHT/2;
+            break;
+      }
+      display.drawLine(offsertx,offserty,offsertx+SCREEN_WIDTH/2,offserty+SCREEN_HEIGHT/2,WHITE);
+      display.drawLine(offsertx,offserty+SCREEN_HEIGHT/2,offsertx+SCREEN_WIDTH/2,offserty,WHITE);
+    }
+  }
+  
+  display.fillRect((marked%2==0)?0:(SCREEN_WIDTH/2+1),(marked<2)?0:(SCREEN_HEIGHT/2+1),SCREEN_WIDTH/2,SCREEN_HEIGHT/2,INVERSE);
+  
+  updateDisplay();
+  
+  delay(100);
   
 }
+
+
 /*
 void statusCallback(const char *name, uint8_t percent){
   Serial.printf("SCB:[%3d] %s \n",percent,name);
 }
-void gcodeCallback(const char *gcode){
-  Serial.printf("GCODE: %s \n",gcode);
-  grbl_putString(gcode);
-}
-
 
 void loop() //runs on Core 1
 {
