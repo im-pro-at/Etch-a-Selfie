@@ -39,6 +39,8 @@
 #define EAS_W 600 //150mm *4
 #define EAS_H 440 //110mm *4
 
+#define BACKLASHCOMPSPEP 2
+
 
 SemaphoreHandle_t wireMutex;
 
@@ -102,8 +104,7 @@ void i2cWorker(void *pvParameter)
   for(;;)
   {
     vTaskDelayUntil( &xLastWakeTime, xFrequency );
-    
-    
+        
     xSemaphoreTake( wireMutex, portMAX_DELAY );    
     
     mpu6050.update();    
@@ -148,13 +149,13 @@ void i2cWorker(void *pvParameter)
     }
     
     //adc2 right 1700 middle 8682 left 0
-    if(adc2 < 7400)
+    if(adc2 < 7500)
     {
-      jostick_x = -1; //left
+      jostick_x = -1*(7500-adc2)/750; //left
     }
     else if(adc2 > 10500)
     {
-      jostick_x = 1; //right   
+      jostick_x = 1*(adc2-10500)/750; //right   
     }
     else{
       jostick_x = 0;            
@@ -162,11 +163,11 @@ void i2cWorker(void *pvParameter)
     //adc1 up ~1700 middle ~9140 down ~0
     if(adc1 < 7400)
     {
-      jostick_y = 1; //down
+      jostick_y = 1*(7500-adc1)/750; //down
     }
     else if(adc1 > 10500)
     {
-      jostick_y = -1; //up     
+      jostick_y = -1*(adc1-10500)/750; //up     
     }
     else{
       jostick_y = 0;            
@@ -325,24 +326,175 @@ void manualControl(uint8_t mode, uint8_t limits_off)
 
     if(x!=0 || y!=0)
     {
-      doAmove(gx+x,gy+y);            
+      doAmove(gx+x,gy+y);                  
     }
+    
+    delay(100);
         
-    if(x!=0 && y!=0)
-    {
-      delay(14);      
-    }
-    else
-    {
-      delay(10);            
-    }
-
     if(jostick_press)
     {
       break;
     }
   }
 }
+
+void cleanMe()
+{
+  display.clearDisplay();
+  display.setTextColor(WHITE); 
+  display.setCursor(10,5);
+  display.setTextSize(2);
+  display.print("Clean Me!");
+  display.setCursor(5,30);
+  display.setTextSize(1);
+               //1234567890123456789
+  display.print("shake me till you ");
+  display.setCursor(5,38);
+  display.print("don't see any ");
+  display.setCursor(5,46);
+  display.print("lines");
+
+  updateDisplay();
+  
+  while(!jostick_press);
+}
+
+void doAmoveSwap(uint16_t x, uint16_t y, uint8_t swap)
+{
+  if(jostick_press==2)
+  {
+    return;
+  }
+    
+  if(swap)
+  {
+    doAmove(y,x);
+  }
+  else
+  {
+    doAmove(x,y);
+  }
+}
+
+uint8_t backlashCompensation(uint8_t swap)
+{
+  uint8_t comStep= BACKLASHCOMPSPEP;
+  uint16_t d = min(EAS_W,EAS_H);
+  uint16_t r = d/12;  
+  
+  doAmoveSwap(0*r,6*r,swap);
+  
+  cleanMe();
+  if(jostick_press==2)
+  {
+    jostick_press=0;
+    return 255;
+  }
+  jostick_press=0;
+
+  //backlash compensation:
+  display.clearDisplay();
+  display.setTextColor(WHITE); 
+  display.setCursor(10,5);
+  display.setTextSize(2);
+  display.print("calibrate");
+  display.setCursor(5,30);
+  display.setTextSize(1);
+               //1234567890123456789
+  display.print("backlash");
+  display.setCursor(5,38);
+  display.print("compensation");
+  display.setCursor(5,46);
+  display.print("please wait ...");
+  updateDisplay();
+  
+  for(int i=0;i<10;i++)
+  {
+    uint16_t x=(i+1)*r+(comStep*i);
+    doAmoveSwap(x,5*r,swap);
+        
+    doAmoveSwap(x,4*r,swap);
+    doAmoveSwap(x,7*r,swap);
+    doAmoveSwap(x,5*r,swap);
+  }
+  doAmoveSwap(11*r,6*r,swap);
+  for(int i=9;i>=0;i--)
+  {
+    uint16_t x=(i+1)*r;
+    doAmoveSwap(x,7*r,swap);
+        
+    doAmoveSwap(x,5*r,swap);
+    doAmoveSwap(x,8*r,swap);
+    doAmoveSwap(x,7*r,swap);
+  }
+  doAmoveSwap(0*r,6*r,swap);
+  
+  if(jostick_press==2)
+  {
+    jostick_press=0;
+    return 255;
+  }
+  jostick_press=0;
+
+  //select the right on
+  int i=1;
+  while(1)
+  {
+    if(jostick_x>0)
+    {
+      i++;
+      if(i>10) i=10;
+    }
+    if(jostick_x<0)
+    {
+      i--;
+      if(i<0) i=0;
+    }
+
+    display.clearDisplay();
+    display.setTextColor(WHITE); 
+    display.setCursor(10,5);
+    display.setTextSize(2);
+    display.print("calibrate");
+    display.setCursor(5,30);
+    display.setTextSize(1);
+                 //1234567890123456789
+    display.print("choose the best");
+    display.setCursor(5,38);
+    display.print("matching pair");
+    display.setCursor(5,46);
+    if(swap)
+    {
+      display.print("count from top");            
+    }
+    else
+    {
+      display.print("count from left");      
+    }
+    display.setCursor(5,54);    
+    display.print("choosen: ");
+    display.print(i);
+    updateDisplay();
+    
+    delay(500);
+    
+    if(jostick_press)
+    {
+      break;
+    }
+  }
+  if(jostick_press==2)
+  {
+    jostick_press=0;
+    return 255;
+  }
+  jostick_press=0;
+
+  return comStep*(i-1);
+}  
+  
+    
+
 
 void calibrate()
 {    
@@ -378,6 +530,7 @@ void calibrate()
     return;
   }
   jostick_press=0;
+
   int16_t blc_x=gx;
   int16_t blc_y=gy;
   
@@ -398,20 +551,60 @@ void calibrate()
   display.print("hitting it");
   updateDisplay();
   
-  
   manualControl(0,1); //jostick mode no limites
+  
+  if(jostick_press==2){
+    jostick_press=0;
+    return;
+  }
+  jostick_press=0;
+  
   int16_t trc_x=gx;
   int16_t trc_y=gy;
   
   calibrated=1;
-  cal_x=EAS_W/(trc_x-blc_x);
-  cal_y=EAS_H/(blc_y-trc_x);
+  if(trc_x==blc_x || blc_y == trc_y)
+  {
+    display.clearDisplay();
+    display.setTextColor(WHITE); 
+    display.setCursor(10,5);
+    display.setTextSize(2);
+    display.print("calibrate");
+    display.setTextSize(1);
+                 //1234567890123456789
+    display.setCursor(5,38);
+    display.print("no movement ....");
+    updateDisplay();
+    delay(1000);
+    
+    delay(1000);
+    return;
+  }
+  cal_x=EAS_W/(double)(trc_x-blc_x);
+  cal_y=EAS_H/(double)(blc_y-trc_y);
+  
+  Serial.printf("Calibration trc_x %d trc_y %d blc_x %d blc_y %d cal_x %f cal_y %f",trc_x,trc_y,blc_x,blc_y,cal_x,cal_y);
   
   if(cal_x<0.8 || cal_x>1.2 || cal_x<0.8 || cal_x>1.2 )
   {
-    printError("calibration way off");
+    display.clearDisplay();
+    display.setTextColor(WHITE); 
+    display.setCursor(10,5);
+    display.setTextSize(2);
+    display.print("calibrate");
+    display.setTextSize(1);
+                 //1234567890123456789
+    display.setCursor(5,38);
+    display.print("ups it did not work");
+    updateDisplay();
+    delay(1000);
+    return;
   }
   
+  
+  
+  
+  calibrated=1;
   setGlobalPosition(0,EAS_W);
   
 }
@@ -433,7 +626,7 @@ void doGammaPhi(char * s1, char *s2, float *gamma, float *phi)
   display.setCursor(102,27); 
   display.print((*gamma));
   
-  (*gamma)+= jostick_y*0.01;    
+  (*gamma)-= jostick_y*0.01;    
   if((*gamma)<0)  (*gamma)=0;
   if((*gamma)>1)  (*gamma)=1;
 
@@ -588,8 +781,11 @@ void takeAselfie()
     updateDisplay();
     delay(1000);
   }
-
+  
   camera_fb_t *fb = esp_camera_fb_get();
+  esp_camera_fb_return(fb);    
+  
+  fb = esp_camera_fb_get();
   if (fb==NULL || fb->width!=800 || fb->height!=600) {
     printError("Camera Capture Failed");
   }  
@@ -619,46 +815,34 @@ void takeAselfie()
   }
   
   jostick_press=0;
+
+  uint8_t scale = max(w/128+1,h/64+1);  
   while(canceled==0)
   {
-    convert_XDOG(w, h, gamma, phi, buffer1, buffer2, bw);
-    
+    //this is an estimation but faster :-)
+    convert_XDOG_o(w, h, gamma, phi, buffer1, buffer2, scale, done);
+
     //dsplay
     display.clearDisplay();
-    uint8_t scale = max(w/128+1,h/64+1);
-    for(uint8_t x=0;x<128;x++) 
+    
+    for(uint8_t y=0;y<h/scale;y++) 
     {
-      for(uint8_t y=0;y<64;y++) 
+      for(uint8_t x=0;x<w/scale;x++) 
       {
-        uint16_t count=0;
-        for(uint8_t dx=0;dx<scale;dx++)
+        if(done[x+y*(w/scale)] == 1)
         {
-          for(uint8_t dy=0;dy<scale;dy++)
-          {
-            if((x*scale+dx)<w && (y*scale+dy)<h)
-            {
-              uint32_t pos= x*scale+dx + (y*scale+dy)*w;
-              if((bw[pos/4] >> ((pos%4)*2)) & 0b11)
-              {
-                count ++;
-              }                    
-            }
-          }              
-        }
-        if(count > (scale*scale)/4) 
-        {
-          display.drawPixel(x,y,WHITE);                          
+          display.drawPixel(x,y,WHITE);                                    
         }
       }          
     }
                         
-    doGammaPhi("Fine","Adjust",&gamma,&phi);
+    doGammaPhi("Fine","Adj.",&gamma,&phi);
     updateDisplay();
 
     if(jostick_press){
       break;
     } 
-  }    
+  }     
   
   if(jostick_press==2)
   {
@@ -669,6 +853,8 @@ void takeAselfie()
   
   if(!canceled)
   {
+    convert_XDOG(w, h, gamma, phi, buffer1, buffer2, bw);
+  
     if(!convert_connect(w, h, progressCallBack, bw, (uint32_t *) buffer1))
     {
       canceled=1;
@@ -698,14 +884,14 @@ void loop() //runs on Core 1
   //  -----|----
   //    2  |  3
   
-  if(jostick_y==1 && marked==0)  marked=2;
-  if(jostick_y==1 && marked==1)  marked=3;
-  if(jostick_y==-1&& marked==2)  marked=0;
-  if(jostick_y==-1&& marked==3)  marked=1;
-  if(jostick_x==1 && marked==0)  marked=1;
-  if(jostick_x==1 && marked==2)  marked=3;
-  if(jostick_x==-1&& marked==1)  marked=0;
-  if(jostick_x==-1&& marked==3)  marked=2;
+  if(jostick_y>=1 && marked==0)  marked=2;
+  if(jostick_y>=1 && marked==1)  marked=3;
+  if(jostick_y<=-1&& marked==2)  marked=0;
+  if(jostick_y<=-1&& marked==3)  marked=1;
+  if(jostick_x>=1 && marked==0)  marked=1;
+  if(jostick_x>=1 && marked==2)  marked=3;
+  if(jostick_x<=-1&& marked==1)  marked=0;
+  if(jostick_x<=-1&& marked==3)  marked=2;
   if(!calibrated) marked=0;
   
   if(jostick_press==1) 
@@ -777,336 +963,12 @@ void loop() //runs on Core 1
   
   delay(100);
   
-}
-
-
-/*
-void statusCallback(const char *name, uint8_t percent){
-  Serial.printf("SCB:[%3d] %s \n",percent,name);
-}
-
-void loop() //runs on Core 1
-{
-  char * table = "$@B%8WM#*awmzcvunxr,. ";
-  camera_fb_t *fb;
-  sensor_t *s;
-  
-  s = esp_camera_sensor_get();
-  s->set_framesize(s, FRAMESIZE_QQVGA);    //160x120
-  delay(100);
-  uint64_t start_time = esp_timer_get_time();
-  fb = esp_camera_fb_get();
-  if (!fb) {
-    Serial.printf("Camera Capture Failed");
-  }  
-  else{
-      Serial.printf("\nl=%d w=%d h=%d format=%d\n",fb->len, fb->width,fb->height,fb->format);
-
-      uint16_t w=120;//87;  //750/550=1.36*64=87
-      uint16_t h=88;//64;      
-      uint8_t  *rgbbuf  =(uint8_t*) heap_caps_calloc(fb->width*fb->height*3, 1, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-      uint8_t  *gray    =(uint8_t*) heap_caps_calloc(w*h, 1, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-      uint16_t *buffer1 =(uint16_t*)heap_caps_calloc(w*h*2, 1, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-      uint16_t *buffer2 =(uint16_t*)heap_caps_calloc(w*h*2, 1, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-      uint8_t  *bw      =(uint8_t*) heap_caps_calloc(w*h/4+1, 1, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-      
-      if(rgbbuf==NULL ||gray==NULL ||buffer1==NULL ||buffer2==NULL ||bw==NULL)
-      {
-        Serial.println("!!!!!!!!!!!!!!!!!!MALLOC ERROR!!!!!!!!!!!!!!!!!!!");
-        Serial.printf("rgbbuf %x gray %x buffer1 %x buffer1 %x bw %x /n",rgbbuf,gray,buffer1,buffer2,bw);
-        delay(1000);
-      }
-      
-    Serial.println("JEPAG IMAGE DATA: ");
-    Serial.print("var image=[");
-    for(uint32_t i=0;i<fb->len;i++){
-      Serial.print(fb->buf[i]);
-      if(i!=fb->len-1)Serial.print(",");
-      
-    }
-    Serial.println("]");
-    Serial.println("var binary=\"\";");
-    Serial.println("for(var i=0;i<image.length;i++){");
-    Serial.println("    binary+=String.fromCharCode(image[i])");
-    Serial.println("}");
-    Serial.println("var base64=window.btoa(binary)");
-    Serial.println("$(\"#image\")[0].src=\"data:image/jpeg;base64,\"+base64    ");
-
-
-      fmt2rgb888(fb->buf,fb->len,fb->format,rgbbuf);
-
-      
-      convert_RGB2Grayscale(fb->width, fb->height, rgbbuf, w, h, gray);
-      
-      convert_XDOG_init(w,h, NULL, gray, buffer1, buffer2);
-      
-      convert_XDOG(w, h, 0.8, 0.4, buffer1, buffer2, bw);
-      
-      for(uint16_t y=0;y<h;y++){
-        Serial.print("_");      
-        for(uint16_t x=0;x<w;x++){
-          uint32_t pos =(x+y*w);
-          switch((bw[pos/4] >> ((pos%4)*2)) & 0b11){
-            case 0:
-              Serial.print(' ');
-              break;
-            case 1:
-              Serial.print('.');
-              break;
-            case 2:
-              Serial.print('*');
-              break;
-            case 3:
-              Serial.print('#');
-              break;
-          }
-        }
-        Serial.println();      
-      }
-      
-      //dsplay
-      display.clearDisplay();
-      uint32_t scale= 256*64/h;
-      for(uint8_t x=0;x<w;x++) 
-      {
-        for(uint8_t y=0;y<h;y++) 
-        {
-          uint32_t pos= x+y*w;
-          if((bw[pos/4] >> ((pos%4)*2)) & 0b11)
-          {
-            display.drawPixel(x*scale/256,y*scale/256,WHITE);                          
-          }                    
-        }          
-      }
-              
-      display.setCursor(90,0); 
-      display.print("1");
-      
-      xSemaphoreTake( wireMutex, portMAX_DELAY );    
-      display.display(); //~30ms
-      xSemaphoreGive( wireMutex );
-
-      free(bw);
-      free(buffer2);
-      free(buffer1);
-      free(gray);
-      free(rgbbuf);
-
-      esp_camera_fb_return(fb);    
-
-      uint64_t fb_get_time = esp_timer_get_time();
-      Serial.printf("one frame in %u ms.\n", (fb_get_time - start_time) / 1000); // this line can be commented out
-      
-     
-      
-  }  
-  
-    
-  
-  s = esp_camera_sensor_get();
-  s->set_framesize(s, FRAMESIZE_SVGA);    //800*600
-  delay(100);
-  
-  fb = esp_camera_fb_get();
-  if (!fb) {
-    Serial.printf("Camera Capture Failed");
-  }  
-  else{    
-
-    Serial.printf("\nl=%d w=%d h=%d format=%d\n",fb->len, fb->width,fb->height,fb->format);
-      
-    uint16_t w=600; //150mm *4
-    uint16_t h=440; //110mm *4
-    uint8_t * rgbbuf = (uint8_t*) heap_caps_calloc(fb->width*fb->height*3, 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    uint8_t  *gray    =(uint8_t*) heap_caps_calloc(w*h, 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    uint16_t *buffer1 =(uint16_t*)heap_caps_calloc(w*h*2, 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    uint16_t *buffer2 =(uint16_t*)heap_caps_calloc(w*h*2, 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    uint8_t *bw      =(uint8_t*) heap_caps_calloc(w*h/4+1, 1, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    uint8_t  *done    =(uint8_t*) heap_caps_calloc(w*h/8+1, 1, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-      
-    if(rgbbuf==NULL ||gray==NULL ||buffer1==NULL ||buffer2==NULL ||bw==NULL ||done==NULL)
-    {
-      
-      Serial.println("!!!!!!!!!!!!!!!!!!MALLOC ERROR!!!!!!!!!!!!!!!!!!!");
-      Serial.printf("rgbbuf %x gray %x buffer1 %x buffer1 %x bw %x done %x /n",rgbbuf,gray,buffer1,buffer2,bw,done);
-      delay(1000);
-    }
-
-    Serial.println("JEPAG IMAGE DATA: ");
-    Serial.print("var image=[");
-    for(uint32_t i=0;i<fb->len;i++){
-      Serial.print(fb->buf[i]);
-      if(i!=fb->len-1)Serial.print(",");
-      
-    }
-    Serial.println("]");
-    Serial.println("var binary=\"\";");
-    Serial.println("for(var i=0;i<image.length;i++){");
-    Serial.println("    binary+=String.fromCharCode(image[i])");
-    Serial.println("}");
-    Serial.println("var base64=window.btoa(binary)");
-    Serial.println("$(\"#image\")[0].src=\"data:image/jpeg;base64,\"+base64    ");
-
-    fmt2rgb888(fb->buf,fb->len,fb->format,rgbbuf);
-
-    
-    convert_RGB2Grayscale(fb->width, fb->height, rgbbuf, w, h, gray);
-    
-    convert_XDOG_init(w,h, statusCallback, gray, buffer1, buffer2);
-    
-    //for(float gamma=0; gamma<1 ; gamma+=0.1){
-    //  for(float phi=0; phi<1 ; phi+=0.1){
-        //Serial.printf("gamma %f phi %f \n",gamma,phi);
-        //convert_XDOG(w, h, gamma, phi, buffer1, buffer2, bw);
-        convert_XDOG(w, h, 0.8, 0.4, buffer1, buffer2, bw);
-        
-        
-        //dsplay
-        display.clearDisplay();
-
-        
-        
-        uint8_t scale = max(w/128+1,h/64+1);
-        for(uint8_t x=0;x<128;x++) 
-        {
-          for(uint8_t y=0;y<64;y++) 
-          {
-            uint16_t count=0;
-            for(uint8_t dx=0;dx<scale;dx++)
-            {
-              for(uint8_t dy=0;dy<scale;dy++)
-              {
-                if((x*scale+dx)<w && (y*scale+dy)<h)
-                {
-                  uint32_t pos= x*scale+dx + (y*scale+dy)*w;
-                  if((bw[pos/4] >> ((pos%4)*2)) & 0b11)
-                  {
-                    count ++;
-                  }                    
-                }
-              }              
-            }
-            if(count > (scale*scale)/4) 
-            {
-              display.drawPixel(x,y,WHITE);                          
-            }
-          }          
-        }
-                
-        display.setCursor(90,0); 
-        display.print("2");
-        
-        xSemaphoreTake( wireMutex, portMAX_DELAY );    
-        display.display(); //~30ms
-        xSemaphoreGive( wireMutex );
-
-        
-    //  }      
-    //}
-    
-    for(uint16_t y=0;y<h;y++){
-      Serial.print("_");      
-      for(uint16_t x=0;x<w;x++){
-        uint32_t pos =(x+y*w);
-        switch((bw[pos/4] >> ((pos%4)*2)) & 0b11){
-          case 0:
-            Serial.print(' ');
-            break;
-          case 1:
-            Serial.print('.');
-            break;
-          case 2:
-            Serial.print('*');
-            break;
-          case 3:
-            Serial.print('#');
-            break;
-        }
-      }
-      Serial.println();      
-    }
-    convert_connect(w, h, statusCallback, bw, (uint32_t *) buffer1);
-
-    for(uint16_t y=0;y<h;y++){
-      Serial.print("_");      
-      for(uint16_t x=0;x<w;x++){
-        uint32_t pos =(x+y*w);
-        switch((bw[pos/4] >> ((pos%4)*2)) & 0b11){
-          case 0:
-            Serial.print(' ');
-            break;
-          case 1:
-            Serial.print('.');
-            break;
-          case 2:
-            Serial.print('*');
-            break;
-          case 3:
-            Serial.print('#');
-            break;
-        }
-      }
-      Serial.println();      
-    }
-
-    grbl_putString("G1 F10000");
-    convert_etch(w, h, statusCallback, gcodeCallback, bw, done, buffer1, (uint32_t *)buffer2, w*h/2);
-
-    for(uint16_t y=0;y<h;y++){
-      Serial.print("_");      
-      for(uint16_t x=0;x<w;x++){
-        uint32_t pos =(x+y*w);
-        switch((bw[pos/4] >> ((pos%4)*2)) & 0b11){
-          case 0:
-            Serial.print(' ');
-            break;
-          case 1:
-            Serial.print('.');
-            break;
-          case 2:
-            Serial.print('*');
-            break;
-          case 3:
-            Serial.print('#');
-            break;
-        }
-      }
-      Serial.println();      
-    }
-    
-    free(done);
-    free(bw);
-    free(buffer2);
-    free(buffer1);
-    free(gray);
-    free(rgbbuf);
-      
-    esp_camera_fb_return(fb);    
-  }
-  
- 
-  display.clearDisplay();
-  display.setTextColor(WHITE);        // Draw white text
-  display.setCursor(0,0);             // Start at top-left corner
-  display.print("X: ");
-  display.print(angleX);
-  Serial.println(angleX);
-  display.setCursor(0,10);             // Start at top-left corner
-  display.print("Y: ");
-  display.print(angleY);
-  Serial.println(angleY);
-  
-  
-  xSemaphoreTake( wireMutex, portMAX_DELAY );    
-  display.display(); //~30ms
-  xSemaphoreGive( wireMutex );
- 
   static char buf[100];
   static uint8_t p=0;
   
   while (Serial.available() > 0) {
     char c=Serial.read();
-    if(c=='\n'){
+    if(c=='\n' || c=='|'){
       buf[p]=0;
       p=0;
       Serial.println();
@@ -1116,17 +978,10 @@ void loop() //runs on Core 1
       grbl_putString(buf);
       Serial.println();
       Serial.println();
-    
-      
-    }
-    else if(c=='?'){
-      report_realtime_status(CLIENT_SERIAL);      
-    }
+
+      }
     else{
       buf[p++]=c;
     }
-  }
-  
-  delay(1000);
+  } 
 }
-*/

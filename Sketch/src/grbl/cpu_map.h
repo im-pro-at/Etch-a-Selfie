@@ -188,7 +188,7 @@
 		#define DEFAULT_STEPPER_IDLE_LOCK_TIME 250 // stay on
 		
 		#define DEFAULT_STEPPING_INVERT_MASK 0 // uint8_t
-		#define DEFAULT_DIRECTION_INVERT_MASK 0 // uint8_t
+		#define DEFAULT_DIRECTION_INVERT_MASK 1 // Invert x
 		#define DEFAULT_INVERT_ST_ENABLE 0 // boolean
 		#define DEFAULT_INVERT_LIMIT_PINS 1 // boolean
 		#define DEFAULT_INVERT_PROBE_PIN 0 // boolean 
@@ -228,8 +228,8 @@
 		#define DEFAULT_Y_MAX_RATE 30000.0 // mm/min
 		#define DEFAULT_Z_MAX_RATE 5000.0 // mm/min
 		
-		#define DEFAULT_X_ACCELERATION (50.0*60*60) // 10*60*60 mm/min^2 = 10 mm/sec^2
-		#define DEFAULT_Y_ACCELERATION (50.0*60*60) // 10*60*60 mm/min^2 = 10 mm/sec^2
+		#define DEFAULT_X_ACCELERATION (500.0*60*60)
+		#define DEFAULT_Y_ACCELERATION (500.0*60*60) 
 		#define DEFAULT_Z_ACCELERATION (50.0*60*60) 
 		
 		#define DEFAULT_X_MAX_TRAVEL 300.0 // mm NOTE: Must be a positive value.
