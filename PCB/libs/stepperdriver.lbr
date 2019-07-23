@@ -205,22 +205,22 @@
 <wire x1="-2.413" y1="2.159" x2="-2.413" y2="-3.81" width="0.1524" layer="21"/>
 <wire x1="-2.413" y1="2.159" x2="17.653" y2="2.159" width="0.1524" layer="21"/>
 <wire x1="-2.413" y1="-12.319" x2="17.653" y2="-12.319" width="0.1524" layer="21"/>
-<pad name="1A" x="8.89" y="1.27" drill="0.9" rot="R90"/>
-<pad name="1B" x="11.43" y="1.27" drill="0.9" rot="R90"/>
-<pad name="2A" x="6.35" y="1.27" drill="0.9" rot="R90"/>
-<pad name="2B" x="3.81" y="1.27" drill="0.9" rot="R90"/>
-<pad name="DIR" x="16.51" y="-11.43" drill="0.9" rot="R90"/>
-<pad name="EN" x="-1.27" y="-11.43" drill="0.9" rot="R90"/>
-<pad name="GND" x="16.51" y="1.27" drill="0.9" rot="R90"/>
-<pad name="GND@0" x="1.27" y="1.27" drill="0.9" rot="R90"/>
-<pad name="MS1" x="1.27" y="-11.43" drill="0.9" rot="R90"/>
-<pad name="MS2" x="3.81" y="-11.43" drill="0.9" rot="R90"/>
-<pad name="MS3" x="6.35" y="-11.43" drill="0.9" rot="R90"/>
-<pad name="RST" x="8.89" y="-11.43" drill="0.9" rot="R90"/>
-<pad name="SLP" x="11.43" y="-11.43" drill="0.9" rot="R90"/>
-<pad name="STEP" x="13.97" y="-11.43" drill="0.9" rot="R90"/>
-<pad name="VDD" x="13.97" y="1.27" drill="0.9" rot="R90"/>
-<pad name="VMOT" x="-1.27" y="1.27" drill="0.9" rot="R90"/>
+<pad name="1A" x="8.89" y="1.27" drill="0.9" shape="long" rot="R90"/>
+<pad name="1B" x="11.43" y="1.27" drill="0.9" shape="long" rot="R90"/>
+<pad name="2A" x="6.35" y="1.27" drill="0.9" shape="long" rot="R90"/>
+<pad name="2B" x="3.81" y="1.27" drill="0.9" shape="long" rot="R90"/>
+<pad name="DIR" x="16.51" y="-11.43" drill="0.9" shape="long" rot="R90"/>
+<pad name="EN" x="-1.27" y="-11.43" drill="0.9" shape="long" rot="R90"/>
+<pad name="GND" x="16.51" y="1.27" drill="0.9" shape="long" rot="R90"/>
+<pad name="GND@0" x="1.27" y="1.27" drill="0.9" shape="long" rot="R90"/>
+<pad name="MS1" x="1.27" y="-11.43" drill="0.9" shape="long" rot="R90"/>
+<pad name="MS2" x="3.81" y="-11.43" drill="0.9" shape="long" rot="R90"/>
+<pad name="MS3" x="6.35" y="-11.43" drill="0.9" shape="long" rot="R90"/>
+<pad name="RST" x="8.89" y="-11.43" drill="0.9" shape="long" rot="R90"/>
+<pad name="SLP" x="11.43" y="-11.43" drill="0.9" shape="long" rot="R90"/>
+<pad name="STEP" x="13.97" y="-11.43" drill="0.9" shape="long" rot="R90"/>
+<pad name="VDD" x="13.97" y="1.27" drill="0.9" shape="long" rot="R90"/>
+<pad name="VMOT" x="-1.27" y="1.27" drill="0.9" shape="long" rot="R90"/>
 <text x="-0.635" y="-10.16" size="0.6096" layer="21" rot="R90">EN</text>
 <text x="1.905" y="-10.16" size="0.6096" layer="21" rot="R90">MS1</text>
 <text x="4.445" y="-10.16" size="0.6096" layer="21" rot="R90">MS2</text>
