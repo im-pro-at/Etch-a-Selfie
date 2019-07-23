@@ -139,7 +139,7 @@
 <wire x1="234.295" y1="44.755" x2="-1.27" y2="44.755" width="0" layer="20"/>
 <wire x1="-1.27" y1="44.755" x2="-1.27" y2="-1.27" width="0" layer="20"/>
 <text x="67.31" y="1.27" size="1.6" layer="21" font="vector" ratio="16">github.com/pknoe3lh/Etch-a-Selfie</text>
-<text x="100.33" y="39.37" size="3" layer="21" font="vector" ratio="16">ETCH-A-SELFIE</text>
+<text x="99.822" y="40.894" size="3" layer="21" font="vector" ratio="16">ETCH-A-SELFIE</text>
 <rectangle x1="76.524" y1="21.104" x2="77.324" y2="21.184" layer="22" rot="R180"/>
 <rectangle x1="76.524" y1="21.184" x2="77.404" y2="21.264" layer="22" rot="R180"/>
 <rectangle x1="76.524" y1="21.264" x2="77.404" y2="21.344" layer="22" rot="R180"/>

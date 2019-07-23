@@ -6,5 +6,6 @@
 *.s$?
 *.l$?
 
+PCB/gerber/*
 
 
