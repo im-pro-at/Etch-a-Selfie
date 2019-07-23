@@ -13,6 +13,7 @@
 //we use GRBL as a library 
 #include "src/grbl/grbl.h"
 #include "convert.h"
+#include "logo.h"
 
 
 #define PWDN_GPIO_NUM     32
@@ -51,16 +52,17 @@ Adafruit_ADS1115 ads;
 int16_t gx=0;
 int16_t gy=0;
 
-uint8_t calibrated=1;
+uint8_t calibrated=0;
 float cal_x=1;
 float cal_y=1;
+uint8_t blcomp_x=0;
+uint8_t blcomp_y=0;
 
-volatile float angleX=0;
-volatile float angleY=0;
-
-volatile uint8_t jostick_press=0; //short=1, long=2
-volatile int8_t jostick_x=0;
-volatile int8_t jostick_y=0;
+volatile uint8_t joystick_press=0; //short=1, long=2
+volatile int8_t joystick_x=0;
+volatile int8_t joystick_y=0;
+volatile int8_t gyro_x=0;
+volatile int8_t gyro_y=0;
 
 void updateDisplay()
 {
@@ -114,9 +116,17 @@ void i2cWorker(void *pvParameter)
     
     xSemaphoreGive( wireMutex );
 
-    angleX=mpu6050.getAngleX();
-    angleY=mpu6050.getAngleY();  
-
+    float angleX=mpu6050.getAngleX();
+    float angleY=mpu6050.getAngleY();  
+        
+    gyro_x = angleY/3;
+    if(gyro_x<-10)gyro_x=-10;
+    if(gyro_x>10)gyro_x=10;
+    gyro_y = angleX/3;
+    if(gyro_y<-10)gyro_y=-10;
+    if(gyro_y>10)gyro_y=10;
+    
+    
     //adc0 Taster open ~ 17000 closed ~10
     if(adc0 < 8000)
     {
@@ -130,7 +140,7 @@ void i2cWorker(void *pvParameter)
       {
         if(taster_count>10)
         { //>1 sec
-          jostick_press=2; //long 
+          joystick_press=2; //long 
 
           //We want the show that immediately 
           display.setTextColor(INVERSE); 
@@ -138,11 +148,10 @@ void i2cWorker(void *pvParameter)
           display.setCursor(5,20);
           display.print("Canceling");
           updateDisplay();
-          
-          
         }
-        else{
-          jostick_press=1; //short 
+        else
+        {
+          joystick_press=1; //short 
         }
         taster_count=0;
       }
@@ -151,36 +160,37 @@ void i2cWorker(void *pvParameter)
     //adc2 right 1700 middle 8682 left 0
     if(adc2 < 7500)
     {
-      jostick_x = -1*(7500-adc2)/750; //left
+      joystick_x = -1*(7500-adc2)/750; //left
     }
     else if(adc2 > 10500)
     {
-      jostick_x = 1*(adc2-10500)/750; //right   
+      joystick_x = 1*(adc2-10500)/750; //right   
     }
-    else{
-      jostick_x = 0;            
+    else
+    {
+      joystick_x = 0;            
     }
     //adc1 up ~1700 middle ~9140 down ~0
     if(adc1 < 7400)
     {
-      jostick_y = 1*(7500-adc1)/750; //down
+      joystick_y = 1*(7500-adc1)/750; //down
     }
     else if(adc1 > 10500)
     {
-      jostick_y = -1*(adc1-10500)/750; //up     
+      joystick_y = -1*(adc1-10500)/750; //up     
     }
-    else{
-      jostick_y = 0;            
+    else
+    {
+      joystick_y = 0;            
     }
     
   }    
   
 }
 
-void grblRunner(void *pvParameter){
-  
-  grbl_run();
-  
+void grblRunner(void *pvParameter)
+{
+  grbl_run(); 
 }
 
 
@@ -192,17 +202,22 @@ void setup()
   
   Wire.begin(4,15);
 
-  while(!display.begin(SSD1306_SWITCHCAPVCC, 0x3c)) { // Address 0x3D for 128x64
+  while(!display.begin(SSD1306_SWITCHCAPVCC, 0x3c)) 
+  { // Address 0x3D for 128x64
     Serial.println("SSD1306 allocation failed");
     delay(1000);
   }
 
   display.clearDisplay();
+  display.drawBitmap(0,0,logo_image_data,SCREEN_WIDTH,SCREEN_HEIGHT,WHITE);
+
   display.setTextColor(WHITE);
-  display.setTextSize(2);
+  display.setTextSize(1);
  
-  display.setCursor(30,20);
-  display.print("INIT...");
+  display.setCursor(5,48);
+  display.print("     IMPOSSIBLE");
+  display.setCursor(5,56);
+  display.print("    PROTOTYPING");
   updateDisplay();
   
   //run Grbl in a sperate task
@@ -252,7 +267,8 @@ void setup()
   Serial.printf("camera init ...");
   
   esp_err_t err = esp_camera_init(&config);
-  if (err != ESP_OK) {
+  if (err != ESP_OK) 
+  {
     char buffer[100];
     snprintf(buffer, 100, "Camera init failed with error 0x%x", err );      
     printError(buffer);
@@ -300,15 +316,40 @@ void setGlobalPosition(int16_t x, int16_t y)
   grbl_putString(gcode);
 }
 
-void doAmove(int16_t x, int16_t y)
+
+void doAmoveF(int16_t x, int16_t y, float f)
 {
-  gx=x;
-  gy=y;
-  char gcode[100];
-  snprintf(gcode,100,"G1 X%f Y%f F6000",x*cal_x,y*cal_y);
+  static int8_t last_x_dir=0; 
+  static int8_t last_y_dir=0; 
+  char gcode[100];  
+  int8_t x_dir=x==gx?last_x_dir:(x>gx?1:-1); 
+  int8_t y_dir=y==gy?last_y_dir:(y>gy?1:-1); 
+
+  Serial.printf("MOVE X%03d Y%03d DIRX %d DIRY %d \n",x,y,x_dir,y_dir);
+
+  if(last_x_dir != x_dir || last_y_dir != y_dir)
+  {
+    //backlash compensation  
+    snprintf(gcode,100,"G0 X%f Y%f",(gx + x_dir*blcomp_x/2)*cal_x,(gy + y_dir*blcomp_y/2)*cal_y);
+    Serial.printf("GCODE: %s \n",gcode);
+    grbl_putString(gcode);    
+  }
+  
+  snprintf(gcode,100,"G1 X%f Y%f F%f",(x + x_dir*blcomp_x/2)*cal_x,(y + y_dir*blcomp_y/2)*cal_y, f);
   Serial.printf("GCODE: %s \n",gcode);
   grbl_putString(gcode);
+
+  gx=x;
+  gy=y; 
+  last_x_dir=x_dir;  
+  last_y_dir=y_dir;  
 }
+
+void doAmove(int16_t x, int16_t y)
+{
+  doAmoveF(int16_t x, int16_t y, 30000.0);
+}
+
 
 void manualControl(uint8_t mode, uint8_t limits_off)
 {
@@ -318,12 +359,24 @@ void manualControl(uint8_t mode, uint8_t limits_off)
     int16_t x,y;
     switch(mode)
     {
-      case 0: //jostick
-        x=jostick_x;
-        y=jostick_y;
+      case 0: //joystick
+        x=joystick_x;
+        y=joystick_y;
+        break;
+      case 1: //gyro
+        x=gyro_x;
+        y=gyro_y;
         break;
     }
 
+    if(!limits_off)
+    {
+      if(gx+x <0) x=-gx;
+      if(gx+x >EAS_W) x=EAS_W-gx;
+      if(gy+y <0) y=-gy;
+      if(gy+y >EAS_H) y=EAS_H-gy;
+    }
+    
     if(x!=0 || y!=0)
     {
       doAmove(gx+x,gy+y);                  
@@ -331,7 +384,7 @@ void manualControl(uint8_t mode, uint8_t limits_off)
     
     delay(100);
         
-    if(jostick_press)
+    if(joystick_press)
     {
       break;
     }
@@ -356,12 +409,12 @@ void cleanMe()
 
   updateDisplay();
   
-  while(!jostick_press);
+  while(!joystick_press);
 }
 
 void doAmoveSwap(uint16_t x, uint16_t y, uint8_t swap)
 {
-  if(jostick_press==2)
+  if(joystick_press==2)
   {
     return;
   }
@@ -385,12 +438,12 @@ uint8_t backlashCompensation(uint8_t swap)
   doAmoveSwap(0*r,6*r,swap);
   
   cleanMe();
-  if(jostick_press==2)
+  if(joystick_press==2)
   {
-    jostick_press=0;
+    joystick_press=0;
     return 255;
   }
-  jostick_press=0;
+  joystick_press=0;
 
   //backlash compensation:
   display.clearDisplay();
@@ -429,26 +482,26 @@ uint8_t backlashCompensation(uint8_t swap)
   }
   doAmoveSwap(0*r,6*r,swap);
   
-  if(jostick_press==2)
+  if(joystick_press==2)
   {
-    jostick_press=0;
+    joystick_press=0;
     return 255;
   }
-  jostick_press=0;
+  joystick_press=0;
 
   //select the right on
   int i=1;
   while(1)
   {
-    if(jostick_x>0)
+    if(joystick_x>0)
     {
       i++;
       if(i>10) i=10;
     }
-    if(jostick_x<0)
+    if(joystick_x<0)
     {
       i--;
-      if(i<0) i=0;
+      if(i<1) i=1;
     }
 
     display.clearDisplay();
@@ -478,22 +531,90 @@ uint8_t backlashCompensation(uint8_t swap)
     
     delay(500);
     
-    if(jostick_press)
+    if(joystick_press)
     {
       break;
     }
   }
-  if(jostick_press==2)
+  if(joystick_press==2)
   {
-    jostick_press=0;
+    joystick_press=0;
     return 255;
   }
-  jostick_press=0;
+  joystick_press=0;
 
-  return comStep*(i-1);
+  return comStep*(i-1)/2; //Why /2 => it works 
 }  
   
     
+void testCircle()
+{
+  int16_t r=150;
+  uint16_t x=200;
+  uint16_t y=200;
+  
+  static uint16_t dx[500];
+  static uint16_t dy[500];
+  
+  uint16_t p=0;
+  int16_t rx = r;
+  int16_t ry = 0;
+  int16_t rd = 1 - r;
+  do 
+  {
+    dx[p]=rx;
+    dy[p]=ry;
+    p++;
+    ry = ry + 1;
+    if (rd < 0)
+    {
+        rd = rd + 2*ry + 1;          
+    }
+    else
+    {
+        rx = rx - 1;
+        rd = rd + 2*(ry-rx) + 1;
+    }
+  } while(rx > ry);          
+
+  for(int i=0;i<p;i++){
+    doAmove(x+dx[i],y+dy[i]);
+    if(joystick_press==2)  return;
+  }  
+  for(int i=p-1;i>=0;i--){
+    doAmove(x+dy[i],y+dx[i]);
+    if(joystick_press==2)  return;
+  }  
+
+  for(int i=0;i<p;i++){
+    doAmove(x-dy[i],y+dx[i]);
+    if(joystick_press==2)  return;
+  }  
+  for(int i=p-1;i>=0;i--){
+    doAmove(x-dx[i],y+dy[i]);
+    if(joystick_press==2)  return;
+  }  
+
+  for(int i=0;i<p;i++){
+    doAmove(x-dx[i],y-dy[i]);
+    if(joystick_press==2)  return;
+  }  
+  for(int i=p-1;i>=0;i--){
+    doAmove(x-dy[i],y-dx[i]);
+    if(joystick_press==2)  return;
+  }  
+
+  for(int i=0;i<p;i++){
+    doAmove(x+dy[i],y-dx[i]);
+    if(joystick_press==2)  return;
+  }  
+  for(int i=p-1;i>=0;i--){
+    doAmove(x+dx[i],y-dy[i]);
+    if(joystick_press==2)  return;
+  }  
+  
+
+}
 
 
 void calibrate()
@@ -501,9 +622,10 @@ void calibrate()
   calibrated=0;
   cal_x=1;
   cal_y=1;
+  blcomp_x=0;
+  blcomp_y=0;
 
   setGlobalPosition(0,0);
-
 
   display.clearDisplay();
   display.setTextColor(WHITE); 
@@ -523,13 +645,14 @@ void calibrate()
 
   updateDisplay();
   
-  manualControl(0,1); //jostick mode no limites
+  manualControl(0,1); //joystick mode no limites
     
-  if(jostick_press==2){
-    jostick_press=0;
+  if(joystick_press==2)
+  {
+    joystick_press=0;
     return;
   }
-  jostick_press=0;
+  joystick_press=0;
 
   int16_t blc_x=gx;
   int16_t blc_y=gy;
@@ -551,18 +674,18 @@ void calibrate()
   display.print("hitting it");
   updateDisplay();
   
-  manualControl(0,1); //jostick mode no limites
+  manualControl(0,1); //joystick mode no limites
   
-  if(jostick_press==2){
-    jostick_press=0;
+  if(joystick_press==2)
+  {
+    joystick_press=0;
     return;
   }
-  jostick_press=0;
+  joystick_press=0;
   
   int16_t trc_x=gx;
   int16_t trc_y=gy;
   
-  calibrated=1;
   if(trc_x==blc_x || blc_y == trc_y)
   {
     display.clearDisplay();
@@ -580,12 +703,12 @@ void calibrate()
     delay(1000);
     return;
   }
-  cal_x=EAS_W/(double)(trc_x-blc_x);
-  cal_y=EAS_H/(double)(blc_y-trc_y);
+  cal_x=(double)(trc_x-blc_x)/EAS_W;
+  cal_y=(double)(blc_y-trc_y)/EAS_H;
   
-  Serial.printf("Calibration trc_x %d trc_y %d blc_x %d blc_y %d cal_x %f cal_y %f",trc_x,trc_y,blc_x,blc_y,cal_x,cal_y);
+  Serial.printf("Calibration trc_x %d trc_y %d blc_x %d blc_y %d cal_x %f cal_y %f \n",trc_x,trc_y,blc_x,blc_y,cal_x,cal_y);
   
-  if(cal_x<0.8 || cal_x>1.2 || cal_x<0.8 || cal_x>1.2 )
+  if(cal_x<0.5 || cal_x>2 || cal_x<0.5 || cal_x>2 )
   {
     display.clearDisplay();
     display.setTextColor(WHITE); 
@@ -601,11 +724,51 @@ void calibrate()
     return;
   }
   
+  setGlobalPosition(EAS_W,0);
+
+  //backlsh x 
+  uint8_t bl_x = backlashCompensation(0);
+  if(bl_x==255)
+  {
+    return;
+  }
+  blcomp_x=bl_x;
   
-  
-  
+  //backlsh y 
+  uint8_t bl_y =backlashCompensation(1);
+  if(bl_y==255)
+  {
+    return;
+  }
+  blcomp_y=bl_y;
+
+  Serial.printf("Backlash compensation: x %d y %d \n",blcomp_x,blcomp_y);
+
   calibrated=1;
-  setGlobalPosition(0,EAS_W);
+  
+  cleanMe();
+  if(joystick_press==2)
+  {
+    joystick_press=0;
+    return;
+  }
+  joystick_press=0;
+  
+  display.clearDisplay();
+  display.setTextColor(WHITE); 
+  display.setCursor(10,5);
+  display.setTextSize(2);
+  display.print("calibrate");
+  display.setTextSize(1);
+               //1234567890123456789
+  display.setCursor(5,38);
+  display.print("drawing a test");
+  display.setCursor(5,46);
+  display.print("circle for fun");
+  updateDisplay();
+
+  testCircle();
+   
   
 }
 
@@ -626,7 +789,7 @@ void doGammaPhi(char * s1, char *s2, float *gamma, float *phi)
   display.setCursor(102,27); 
   display.print((*gamma));
   
-  (*gamma)-= jostick_y*0.01;    
+  (*gamma)-= joystick_y*0.01;    
   if((*gamma)<0)  (*gamma)=0;
   if((*gamma)>1)  (*gamma)=1;
 
@@ -637,7 +800,7 @@ void doGammaPhi(char * s1, char *s2, float *gamma, float *phi)
   display.setCursor(102,46); 
   display.print((*phi));
   
-  (*phi)+= jostick_x*0.01;    
+  (*phi)+= joystick_x*0.01;    
   if((*phi)<0)  (*phi)=0;
   if((*phi)>1)  (*phi)=1;
   
@@ -646,9 +809,9 @@ void doGammaPhi(char * s1, char *s2, float *gamma, float *phi)
 uint8_t progressCallBack(const char *name, uint8_t percent)
 {
   static uint8_t lastpercent=101;
-  if(jostick_press==2)
+  if(joystick_press==2)
   {
-    jostick_press=0;
+    joystick_press=0;
     return 1;
   }
   if(lastpercent==percent) 
@@ -685,6 +848,19 @@ void takeAselfie()
   display.setCursor(30,20);
   display.print("SELFIE");
   updateDisplay();
+  
+  delay(1000);
+  
+  doAmove(0,EAS_H);
+  
+  cleanMe();
+  if(joystick_press==2)
+  {
+    joystick_press=0;
+    return;
+  }
+  joystick_press=0;
+  
 
   //Preview Mode => lower resolution
   sensor_t *s = esp_camera_sensor_get();
@@ -709,11 +885,12 @@ void takeAselfie()
   {
       printError("Malloc");
   }
-  jostick_press=0;
+  joystick_press=0;
   while(1)
   {
     camera_fb_t *fb = esp_camera_fb_get();
-    if (fb==NULL || fb->width!=160 || fb->height!=120) {
+    if (fb==NULL || fb->width!=160 || fb->height!=120) 
+    {
       printError("Camera Capture Failed");
     }  
     Serial.printf("\nl=%d w=%d h=%d format=%d\n",fb->len, fb->width,fb->height,fb->format);
@@ -751,7 +928,8 @@ void takeAselfie()
     
     esp_camera_fb_return(fb); 
 
-    if(jostick_press){
+    if(joystick_press)
+    {
       break;
     } 
   }    
@@ -761,11 +939,12 @@ void takeAselfie()
   free(gray);
   free(rgbbuf);
 
-  if(jostick_press==2){
-    jostick_press=0;
+  if(joystick_press==2)
+  {
+    joystick_press=0;
     return; //we can return here no unfreed resrouces!
   }
-  jostick_press=0;
+  joystick_press=0;
   
   s->set_framesize(s, FRAMESIZE_SVGA);    //800*600
 
@@ -786,7 +965,8 @@ void takeAselfie()
   esp_camera_fb_return(fb);    
   
   fb = esp_camera_fb_get();
-  if (fb==NULL || fb->width!=800 || fb->height!=600) {
+  if (fb==NULL || fb->width!=800 || fb->height!=600) 
+  {
     printError("Camera Capture Failed");
   }  
   Serial.printf("\nl=%d w=%d h=%d format=%d\n",fb->len, fb->width,fb->height,fb->format);
@@ -814,7 +994,7 @@ void takeAselfie()
     canceled=1;
   }
   
-  jostick_press=0;
+  joystick_press=0;
 
   uint8_t scale = max(w/128+1,h/64+1);  
   while(canceled==0)
@@ -839,16 +1019,17 @@ void takeAselfie()
     doGammaPhi("Fine","Adj.",&gamma,&phi);
     updateDisplay();
 
-    if(jostick_press){
+    if(joystick_press)
+    {
       break;
     } 
   }     
   
-  if(jostick_press==2)
+  if(joystick_press==2)
   {
     canceled=1;
   }
-  jostick_press=0;
+  joystick_press=0;
   
   
   if(!canceled)
@@ -877,6 +1058,52 @@ void takeAselfie()
 
 }
 
+void joystick()
+{
+  
+  display.clearDisplay();
+  display.setTextColor(WHITE); 
+  display.setCursor(10,5);
+  display.setTextSize(2);
+  display.print("joystick");
+  display.setCursor(5,38);
+  display.setTextSize(1);
+               //1234567890123456789
+  display.print("use the joystick");
+  display.setCursor(5,46);
+  display.print("to draw freely");
+
+  updateDisplay();
+  
+  manualControl(0,0); //joystick mode with limites
+  
+  joystick_press=0;
+  
+
+}
+
+void gyro()
+{
+  
+  display.clearDisplay();
+  display.setTextColor(WHITE); 
+  display.setCursor(10,5);
+  display.setTextSize(2);
+  display.print("hand mode");
+  display.setCursor(5,38);
+  display.setTextSize(1);
+               //1234567890123456789
+  display.print("tilt me to draw");
+
+  updateDisplay();
+  
+  manualControl(1,0); //gyro mode with limites
+  
+  joystick_press=0;
+  
+
+}
+
 void loop() //runs on Core 1
 {  
   static uint8_t marked=0;
@@ -884,19 +1111,19 @@ void loop() //runs on Core 1
   //  -----|----
   //    2  |  3
   
-  if(jostick_y>=1 && marked==0)  marked=2;
-  if(jostick_y>=1 && marked==1)  marked=3;
-  if(jostick_y<=-1&& marked==2)  marked=0;
-  if(jostick_y<=-1&& marked==3)  marked=1;
-  if(jostick_x>=1 && marked==0)  marked=1;
-  if(jostick_x>=1 && marked==2)  marked=3;
-  if(jostick_x<=-1&& marked==1)  marked=0;
-  if(jostick_x<=-1&& marked==3)  marked=2;
+  if(joystick_y>=1 && marked==0)  marked=2;
+  if(joystick_y>=1 && marked==1)  marked=3;
+  if(joystick_y<=-1&& marked==2)  marked=0;
+  if(joystick_y<=-1&& marked==3)  marked=1;
+  if(joystick_x>=1 && marked==0)  marked=1;
+  if(joystick_x>=1 && marked==2)  marked=3;
+  if(joystick_x<=-1&& marked==1)  marked=0;
+  if(joystick_x<=-1&& marked==3)  marked=2;
   if(!calibrated) marked=0;
   
-  if(jostick_press==1) 
+  if(joystick_press==1) 
   {
-    jostick_press=0;
+    joystick_press=0;
     switch(marked)
     {
       case 0: //Calibration
@@ -905,13 +1132,15 @@ void loop() //runs on Core 1
       case 1: //Selfie
         takeAselfie();
         break;
-      case 2: //Jostick
+      case 2: //joystick
+        joystick();
         break;
       case 3: //Acceloration
+        gyro();
         break;
     }
   }
-  if(jostick_press==2) jostick_press=0;
+  if(joystick_press==2) joystick_press=0;
   
   
   //draw menue:
@@ -927,7 +1156,7 @@ void loop() //runs on Core 1
   display.setCursor(SCREEN_WIDTH/2,12);        
   display.print("  Selfie  ");
   display.setCursor(0,SCREEN_HEIGHT/2+12);        
-  display.print("  Jostick ");
+  display.print("  joystick ");
   display.setCursor(SCREEN_WIDTH/2,SCREEN_HEIGHT/2+12);        
   display.print("   Hand   ");
 
@@ -966,9 +1195,11 @@ void loop() //runs on Core 1
   static char buf[100];
   static uint8_t p=0;
   
-  while (Serial.available() > 0) {
+  while (Serial.available() > 0) 
+  {
     char c=Serial.read();
-    if(c=='\n' || c=='|'){
+    if(c=='\n' || c=='|')
+    {
       buf[p]=0;
       p=0;
       Serial.println();
@@ -979,8 +1210,9 @@ void loop() //runs on Core 1
       Serial.println();
       Serial.println();
 
-      }
-    else{
+    }
+    else
+    {
       buf[p++]=c;
     }
   } 

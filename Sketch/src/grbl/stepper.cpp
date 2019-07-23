@@ -617,10 +617,6 @@ void st_reset()
 
 }
 
-
-
-
-
 void IRAM_ATTR set_direction_pins_on(uint8_t onMask)
 {
 	// inverts are applied in step generation
