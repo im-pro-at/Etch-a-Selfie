@@ -16,5 +16,10 @@
 | 2    |  6,27€ | [HANPOSE 17HS2408 28mm Nema 17 Stepper Motor 42 Motor 42BYGH 0.6A 12N.cm](https://www.banggood.com/HANPOSE-28mm-Nema-17-Stepper-Motor-42-Motor-17HS2408-42BYGH-0_6A-12N_cm-4-lead-For-CNC-Laser-3D-Printer-Motor-p-1415423.html?rmmds=myorder&cur_warehouse=CN) |
 | 1    |  3,94€ | [AC 100-240V Converter Adapter 12V 2A 24W Power Supply](https://www.banggood.com/AC-100-240V-Converter-Adapter-12V-2A-24W-Power-Supply-For-LED-Strip-p-1006925.html?rmmds=search&ID=43100&cur_warehouse=CN) |
 | 1    |  1,28€ | [2.54mm Single Row Male Pin Header](https://www.banggood.com/10-Pcs-40-Pin-2_54mm-Single-Row-Male-Pin-Header-Strip-For-Arduino-p-918427.html?rmmds=search&cur_warehouse=CN) |
+| 3    |      - | 4k7 Ohm Resistor 1/4W                                        |
+| 4    |      - | M3 screw 8mm length                                          |
+| 2    |  1,60€ | [Cork Gasket (Optional)](https://www.banggood.com/5PCS-4242mm-Cork-Gasket-Nema-17-Stepper-Motor-Damper-For-42-Motor-Absorber-3D-Printer-Part-p-1446977.html?rmmds=myorder&cur_warehouse=CN) |
+| 2    |      - | 100µF 35V Capacitor E2,5-6 (Optional)                        |
+|      |        |                                                              |
 |      |   ~89€ | TOTAL                                                        |
 
