@@ -20,7 +20,7 @@ Later Version may work but are not tested ...
 | Partion Scheme      | Huge APP (3Mb No OTA) |
 | Core Debug Level    | None                  |
 
-#Flashing
+# Flashing
 
 Look [here](https://github.com/raphaelbs/esp32-cam-ai-thinker#flashing) 
 
