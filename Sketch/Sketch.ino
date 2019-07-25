@@ -9,6 +9,7 @@
 #include <MPU6050_tockn.h>
 #include <Adafruit_ADS1015.h>
 #include <esp_camera.h>
+#include <math.h>
 
 //we use GRBL as a library 
 #include "src/grbl/grbl.h"
@@ -51,6 +52,9 @@ Adafruit_ADS1115 ads;
 
 int16_t gx=0;
 int16_t gy=0;
+int8_t last_x_dir=1; 
+int8_t last_y_dir=1; 
+
 
 uint8_t calibrated=0;
 float cal_x=0.9;
@@ -58,11 +62,13 @@ float cal_y=0.9;
 uint8_t blcomp_x=5;
 uint8_t blcomp_y=5;
 
+int16_t zero_adc1;
+int16_t zero_adc2;
 volatile uint8_t joystick_press=0; //short=1, long=2
-volatile int8_t joystick_x=0;
-volatile int8_t joystick_y=0;
-volatile int8_t gyro_x=0;
-volatile int8_t gyro_y=0;
+volatile float joystick_x=0;
+volatile float joystick_y=0;
+volatile float gyro_x=0;
+volatile float gyro_y=0;
 
 void updateDisplay()
 {
@@ -119,10 +125,10 @@ void i2cWorker(void *pvParameter)
     float angleX=mpu6050.getAngleX();
     float angleY=mpu6050.getAngleY();  
         
-    gyro_x = angleY/3;
+    gyro_x = angleY/3.0;
     if(gyro_x<-10)gyro_x=-10;
     if(gyro_x>10)gyro_x=10;
-    gyro_y = angleX/3;
+    gyro_y = angleX/3.0;
     if(gyro_y<-10)gyro_y=-10;
     if(gyro_y>10)gyro_y=10;
     
@@ -158,32 +164,31 @@ void i2cWorker(void *pvParameter)
     }
     
     //adc2 right 1700 middle 8682 left 0
-    if(adc2 < 7500)
+    if(adc2 < zero_adc2-20)
     {
-      joystick_x = -1*(7500-adc2)/750; //left
+      joystick_x = -1*(zero_adc2-adc2)/750.0; //left
     }
-    else if(adc2 > 10500)
+    else if(adc2 > zero_adc2+20)
     {
-      joystick_x = 1*(adc2-10500)/750; //right   
+      joystick_x = 1*(adc2-zero_adc2)/750.0; //right   
     }
     else
     {
       joystick_x = 0;            
     }
     //adc1 up ~1700 middle ~9140 down ~0
-    if(adc1 < 7400)
+    if(adc1 < zero_adc1-20)
     {
-      joystick_y = 1*(7500-adc1)/750; //down
+      joystick_y = 1*(zero_adc1-adc1)/750.0; //down
     }
-    else if(adc1 > 10500)
+    else if(adc1 > zero_adc1+20)
     {
-      joystick_y = -1*(adc1-10500)/750; //up     
+      joystick_y = -1*(adc1-zero_adc1)/750.0; //up     
     }
     else
     {
       joystick_y = 0;            
-    }
-    
+    }    
   }    
   
 }
@@ -293,6 +298,15 @@ void setup()
   
   ads.begin();
   
+  zero_adc1 = ads.readADC_SingleEnded(1);
+  zero_adc2 = ads.readADC_SingleEnded(2);
+  
+  if(zero_adc1 < 7400 || zero_adc1 > 10500 || zero_adc2 < 7400 || zero_adc2 > 10500)
+  {
+    printError("Do not touch the joystick at startup!");
+  }
+
+  
   xTaskCreatePinnedToCore
     (	  
       i2cWorker,    // task
@@ -306,21 +320,9 @@ void setup()
   
 }
 
-void setGlobalPosition(int16_t x, int16_t y)
-{
-  gx=x;
-  gy=y;
-  char gcode[100];
-  snprintf(gcode,100,"G92 X%f Y%f",x*cal_x,y*cal_y);
-  Serial.printf("GCODE: %s \n",gcode);
-  grbl_putString(gcode);
-}
-
 
 void doAmoveF(int16_t x, int16_t y, float f)
 {
-  static int8_t last_x_dir=0; 
-  static int8_t last_y_dir=0; 
   char gcode[100];  
   int8_t x_dir=x==gx?last_x_dir:(x>gx?1:-1); 
   int8_t y_dir=y==gy?last_y_dir:(y>gy?1:-1); 
@@ -350,9 +352,37 @@ void doAmove(int16_t x, int16_t y)
   doAmoveF(x, y, 30000.0);
 }
 
+void setGlobalPosition(int16_t x, int16_t y)
+{
+  gx=x;
+  gy=y;
+  char gcode[100];
+  snprintf(gcode,100,"G92 X%f Y%f",x*cal_x,y*cal_y);
+  Serial.printf("GCODE: %s \n",gcode);
+  grbl_putString(gcode);
+  //apply backlash
+  doAmove(0,0);
+}
+
 
 void manualControl(uint8_t mode, uint8_t limits_off)
 {
+  TickType_t xLastWakeTime;
+  const TickType_t xFrequency = 100/portTICK_PERIOD_MS; //do this 10 times a secound   
+
+  int32_t current_position[N_AXIS]; 
+  float planer_position[N_AXIS];
+  float motor_position[N_AXIS];
+  
+  // Copy current state of the system position variable
+  memcpy(current_position,sys_position,sizeof(sys_position));
+  system_convert_array_steps_to_mpos(planer_position,current_position);
+
+  planer_position[0]-= last_x_dir*blcomp_x/2*cal_x;
+  planer_position[1]-= last_y_dir*blcomp_y/2*cal_y;
+  
+  xLastWakeTime = xTaskGetTickCount();
+  
   char gcode[100];
   while(1)
   {
@@ -377,12 +407,34 @@ void manualControl(uint8_t mode, uint8_t limits_off)
       if(gy+y >EAS_H) y=EAS_H-gy;
     }
     
-    if(x!=0 || y!=0)
+    // Copy current state of the system position variable
+    memcpy(current_position,sys_position,sizeof(sys_position));
+    system_convert_array_steps_to_mpos(motor_position,current_position);
+
+    motor_position[0]-= last_x_dir*blcomp_x/2*cal_x;
+    motor_position[1]-= last_y_dir*blcomp_y/2*cal_y;
+    
+    
+    float distanceGRBL = sqrt(   (motor_position[0]-planer_position[0])*(motor_position[0]-planer_position[0]) 
+                               + (motor_position[1]-planer_position[1])*(motor_position[1]-planer_position[1]));
+    float distanceJOY = sqrt(x*cal_x*x*cal_x+y*cal_y*y*cal_y);
+    
+    Serial.printf("Jostick dX %d dY %d DGRBL %f DJOY %f \n",x,y,distanceGRBL,distanceJOY);
+
+    if(distanceJOY>0 && distanceGRBL <= distanceJOY)
     {
-      doAmove(gx+x,gy+y);                  
+      //calc feedrate distance/min 
+      float featrate=distanceJOY * 10 * 60 * 0.5; // run at 90% 
+      doAmoveF(gx+x,gy+y,featrate);  
+      planer_position[0]+=x*cal_x;
+      planer_position[1]+=y*cal_y;          
+    }
+    else 
+    {
+      Serial.printf("Skipped!\n");        
     }
     
-    delay(100);
+    vTaskDelayUntil( &xLastWakeTime, xFrequency );
         
     if(joystick_press)
     {
@@ -493,12 +545,12 @@ uint8_t backlashCompensation(uint8_t swap)
   int i=1;
   while(1)
   {
-    if(joystick_x>0)
+    if(joystick_x>=1)
     {
       i++;
       if(i>10) i=10;
     }
-    if(joystick_x<0)
+    if(joystick_x<=-1)
     {
       i--;
       if(i<1) i=1;
@@ -789,7 +841,7 @@ void doGammaPhi(char * s1, char *s2, float *gamma, float *phi)
   display.setCursor(102,27); 
   display.print((*gamma));
   
-  (*gamma)-= joystick_y*0.01;    
+  (*gamma)-= ((int16_t)joystick_y)*0.01;    
   if((*gamma)<0)  (*gamma)=0;
   if((*gamma)>1)  (*gamma)=1;
 
@@ -800,7 +852,7 @@ void doGammaPhi(char * s1, char *s2, float *gamma, float *phi)
   display.setCursor(102,46); 
   display.print((*phi));
   
-  (*phi)+= joystick_x*0.01;    
+  (*phi)+= ((int16_t)joystick_x)*0.01;    
   if((*phi)<0)  (*phi)=0;
   if((*phi)>1)  (*phi)=1;
   
@@ -1234,11 +1286,28 @@ void loop() //runs on Core 1
         break;
     }
   }
+  
+  //hidden test modes
   if(joystick_press==2) {
     joystick_press=0;
     if(joystick_x>=1 && joystick_y>=1)
     {
       testpicture();
+    }
+    if(joystick_x<=-1 && joystick_y<=-1)
+    {
+      calibrated=1;
+      cal_x=1.2;
+      cal_y=1.2;
+      doAmove(-EAS_W,-EAS_H);
+      cal_x=0.9;
+      cal_y=0.9;
+      blcomp_x=5;
+      blcomp_y=5;
+      setGlobalPosition(0,0);
+      doAmove(30,30);
+      setGlobalPosition(0,0);
+      doAmove(0,0);
     }
   }
   
