@@ -1,7 +1,9 @@
-# Libraries
+# Versions 
 
 | Name                          | Version |
 | ----------------------------- | ------- |
+| Arduino IDE                   | 1.8.9   |
+| ESP32 core                    | 1.0.2   |
 | adafruit/Adafruit-GFX-Library | 1.5.6   |
 | adafruit/Adafruit_SSD1306     | 1.3.0   |
 | tockn/MPU6050_tockn           | 1.5.2   |
