@@ -1,13 +1,13 @@
 # Etch-a-Selfie
 ESP32_CAM meets Etch-A-Sketch => Etch-a-Selfie
 
-![result](images\result.png)
+![result](images/result.jpg)
 
 
 
 ## System Overview
 
-![system](images\system.jpg)
+![system](images/system.jpg)
 
 ## Software
 
